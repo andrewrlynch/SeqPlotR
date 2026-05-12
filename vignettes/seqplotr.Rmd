@@ -1,0 +1,122 @@
+---
+title: "getting-started"
+author: "Andrew Lynch"
+date: "2026-05-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Getting Started
+
+## Syntax
+## Tracks and windows
+## Elements
+### Primitive Elements
+#### seq_point()
+#### seq_line()
+#### seq_segment()
+#### seq_curve()
+#### seq_path()
+#### seq_poly()
+#### seq_area()
+#### seq_text()
+### Composites
+#### seq_bar()
+#### seq_ribbon()
+#### seq_density()
+#### seq_tile()
+#### seq_lollipop()
+#### seq_gene()
+#### seq_sequence()
+#### seq_ideogram()
+## Grid Layout
+## Axes
+## Legends
+
+### GIAB HG008 Variants
+
+```{r pressure, echo = FALSE}
+
+calc_nearest_variant_dist <- function(gr) {
+  gr <- sort(gr)
+  gr <- gr[seqnames(gr) %in% seqnames(gr)[lengths(split(gr, seqnames(gr))) > 0]]
+  seqlevels(gr) <- seqlevelsInUse(gr)
+  
+  result <- lapply(split(gr, seqnames(gr)), function(chr_gr) {
+    if (length(chr_gr) == 0) return(chr_gr)
+    pos <- start(chr_gr)
+    dist <- c(diff(pos), NA_integer_)
+    chr_gr$dist_to_next <- dist
+    chr_gr
+  })
+  
+  do.call(c, unname(result))
+}
+
+## SNV
+smv <- readVcfAsVRanges("/Volumes/ARC2/01-Inbox/GIAB_HG008/variants/HG008-T--HG008-N.snv.indel.final.v7.annotated.vcf.gz")
+snv <- GRanges(smv[sampleNames(smv) == "HG008-T" & smv$TYPE == "SNV"])
+snv$AF <- unlist(snv$AF)
+
+snv <- calc_nearest_variant_dist(snv)
+snv$dist_to_next_log <- log10(snv$dist_to_next)
+
+## InDel
+id <- GRanges(smv[sampleNames(smv) == "HG008-T" & smv$TYPE %in% c("DEL","INS")])
+id$AF <- unlist(id$AF)
+id <- calc_nearest_variant_dist(id)
+id$dist_to_next_log <- log10(id$dist_to_next)
+
+## SV
+sv <- readVcf("/Volumes/ARC2/01-Inbox/GIAB_HG008/variants/NIST_HG008-T_somatic-stvar-CNV_DraftBenchmark_V0.5-20260318/GRCh38_HG008-T-V0.5_somatic-stvar_PASS.draftbenchmark.vcf.gz")
+sv <- sv[seqnames(sv) %in% paste0("chr",c(1,22,"X"))]
+sv.bp <- c(StructuralVariantAnnotation::breakpointRanges(sv), StructuralVariantAnnotation::breakendRanges(sv))
+rtracklayer::export(StructuralVariantAnnotation::breakpointgr2pairs(sv.bp), con = "/Volumes/ARC2/01-Inbox/GIAB_HG008/variants/HG008-T--HG008-N.sv.gridss.bedpe")
+sv.bedpe <- read.table("/Volumes/ARC2/01-Inbox/GIAB_HG008/variants/HG008-T--HG008-N.sv.gridss.bedpe", header = FALSE, sep = "\t")
+names(sv.bedpe) <- c("chrom1", "start1", "end1", "chrom2", "start2", "end2", "name", "score", "strand1", "strand2")
+
+## CNA
+cna <- makeGRangesFromDataFrame(read.table("/Volumes/ARC2/01-Inbox/GIAB_HG008/variants/HG008-T--HG008-N.bicseq2.txt", sep = "\t", header = TRUE), keep.extra.columns = TRUE)
+
+```
+
+
+```{r}
+windows = create_genome_windows(paste0(c("1", "2")))
+p <- seq_plot(aesthetics = aes(window.gap.width = 0)) %|%
+  seq_track(windows = windows, track_outer_margin = c(0.05,0.05,0,0), window_inner_margin  = 0, window_outer_margin = 0) %+%
+  seq_recon(data = sv.bedpe, mapping = map(chrom0 = chrom1, x0 = start1, chrom1 = chrom2, x1 = start2, strand0 = strand1, strand1 = strand2)) %__%
+  seq_track(windows = windows, track_outer_margin = c(0.05,0.05,0,0), window_inner_margin  = 0, window_outer_margin = 0, scale_y  = seq_scale_continuous(limits = c(-2, 1), cap = "exact", expand = c(0,0))) %+%
+  seq_segment(data = cna, map(y = log2.copyRatio, y_end = log2.copyRatio), aes(lwd = 1.5)) %__%
+  seq_track(windows = windows, track_outer_margin = c(0.01,0.05,0,0), window_inner_margin = 0, window_outer_margin = 0, scale_y = seq_scale_continuous(cap = "full"), scale_x = seq_scale_genomic(windows = windows, cap = "exact")) %+%
+  seq_point(data = snv, map(y = AF, color = AF), aes(size = 0.2, alpha = 0.9)) %__%
+  seq_track(windows = windows, track_outer_margin = c(0.01,0.05,0,0), window_inner_margin = 0, window_outer_margin = 0, scale_y = seq_scale_continuous(cap = "full"), scale_x = seq_scale_genomic(windows = windows, cap = "exact"), aesthetics = aes(axis.x = aes(line.col = "black", ticks.col = "black"))) %+%
+  seq_point(data = snv, map(y = dist_to_next_log, color = AF), aes(size = 0.2))
+
+p$plot()
+```
+
+## Data Mapping
+## Aesthetics
+## Wrappers
+
+### Hi-C Plots
+
+```{r, echo=FALSE}
+fetchwindows1 = create_genome_windows(c("1"), add_chr = FALSE)
+fetchwindows2 = create_genome_windows(c("2"), add_chr = FALSE)
+hic <- open_hic("/Volumes/ARC2/01-Inbox/K562/4DNFIDBIEXI7.hic", resolution = 1000000, max_fetch_bp = 300000000)
+hic_test <- makeGRangesFromDataFrame(hic$fetch(region1 = fetchwindows1, region2 = fetchwindows2), seqnames.field = "seqnames1", start.field = "start1", end.field = "end1", keep.extra.columns = TRUE)
+
+hic_test$i_start <- start(hic_test)
+hic_test$i_end <- end(hic_test)
+hic_test$j_start <- hic_test$start2
+hic_test$j_end <- hic_test$end2
+
+seq_hic(hic_test, windows = c(fetchwindows1, fetchwindows2), max_dist = 20000000, style = "rectangle")$plot()
+
+```
+

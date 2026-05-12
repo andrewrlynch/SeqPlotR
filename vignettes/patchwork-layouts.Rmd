@@ -1,0 +1,140 @@
+---
+title: "Patchwork Layouts in SeqPlotR"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 2
+vignette: >
+  %\VignetteIndexEntry{Patchwork Layouts in SeqPlotR}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse   = TRUE,
+  comment    = "#>",
+  fig.width  = 7,
+  fig.height = 5,
+  dev        = "png",
+  dpi        = 192
+)
+set.seed(1)
+```
+
+```{css echo = FALSE}
+img { max-width: 100%; height: auto; }
+```
+
+SeqPlotR supports two layout modes:
+
+- **Positional** — tracks flow using `direction = "right"` or
+  `"under"` (aliased by the `%|%` and `%__%` operators).
+- **Patchwork** — a multiline string assigns each track to a named
+  rectangular region. This is inspired by the
+  [`patchwork`](https://patchwork.data-imaginist.com) layout string.
+
+```{r load}
+library(SeqPlotR)
+library(GenomicRanges)
+
+win <- GRanges("chr1", IRanges(1, 1e6))
+```
+
+## Positional layout via track widths and heights
+
+```{r positional}
+gr <- GRanges("chr1", IRanges(seq(1, 1e6, length.out = 200), width = 1),
+              score = rnorm(200))
+
+p <- seq_plot() %+%
+  seq_track(data = gr, mapping = map(x = start, y = score),
+            windows = win, track_id = "A", track_width = 2) %+% seq_line() %|%
+  seq_track(data = gr, mapping = map(x = start, y = score),
+            windows = win, track_id = "B") %+% seq_point() %__%
+  seq_track(data = gr, mapping = map(x = start, y = score),
+            windows = win, track_id = "C") %+% seq_area()
+
+p$plot()
+```
+
+`track_width` and `track_height` are *relative* within the row and
+column respectively: track `A` above is twice as wide as `B`.
+
+## Patchwork layout string
+
+Passing a layout string to `seq_plot()` makes every cell position
+explicit. Each unique letter is a region; `#` cells stay blank.
+
+```{r patchwork-string}
+layout <- "
+##AA
+##AA
+BBBC
+BBBD
+"
+p <- seq_plot(layout = layout) %+%
+  seq_track(data = gr, mapping = map(x = start, y = score),
+            windows = win, track_id = "A") %+% seq_line() %+%
+  seq_track(data = gr, mapping = map(x = start, y = score),
+            windows = win, track_id = "B") %+% seq_area()  %+%
+  seq_track(data = gr, mapping = map(x = start, y = score),
+            windows = win, track_id = "C") %+% seq_bar()   %+%
+  seq_track(data = gr, mapping = map(x = start, y = score),
+            windows = win, track_id = "D") %+% seq_point()
+
+p$plot()
+```
+
+With a layout string, each track's `direction` is ignored — placement
+is decided entirely by the `track_id` matching the letters.
+
+## Previewing a layout before adding data
+
+`seq_preview_layout()` is the fastest way to validate a layout string:
+
+```{r preview}
+seq_preview_layout(layout = layout)
+```
+
+You can also preview a positional plot built from the operator chain:
+
+```{r preview-positional}
+seq_preview_layout(plot_obj = p)
+```
+
+## Circular preview
+
+`seq_preview_circos()` draws a minimal circular layout, useful as a
+schematic for whole-genome plots. It extracts the track structure from
+a positional `seq_plot` (patchwork layouts are not supported):
+
+```{r circos, fig.width = 5, fig.height = 5}
+gw  <- default_genome_windows()
+circ <- seq_plot() %+%
+  seq_track(windows = gw, track_id = "whole_genome") %+% seq_line()
+seq_preview_circos(plot_obj = circ)
+```
+
+## Relative widths and heights revisited
+
+Both positional and patchwork layouts respect `track_width` and
+`track_height` *within* a cell; the outer cell bounds come from the
+layout string.
+
+```{r weights, fig.height = 6}
+layout <- "
+AAAB
+AAAB
+CCCC
+"
+p <- seq_plot(layout = layout) %+%
+  seq_track(data = gr, mapping = map(x = start, y = score),
+            windows = win, track_id = "A", track_height = 2) %+% seq_line() %+%
+  seq_track(data = gr, mapping = map(x = start, y = score),
+            windows = win, track_id = "B") %+% seq_bar() %+%
+  seq_track(data = gr, mapping = map(x = start, y = score),
+            windows = win, track_id = "C") %+% seq_point()
+
+p$plot()
+```

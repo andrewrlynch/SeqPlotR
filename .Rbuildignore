@@ -1,0 +1,14 @@
+^\.claude$
+^\.Rproj\.user$
+^\.Rhistory$
+^\.DS_Store$
+^01_SeqPlotR_Initiation\.md$
+^02_SeqPlotR_Project\.md$
+^03_SeqPlotR_MultiAgent_Plan\.md$
+^CLAUDE\.md$
+^preview\.R$
+^LICENSE\.md$
+^Rplots\.pdf$
+^doc$
+^Meta$
+^.*\.Rproj$

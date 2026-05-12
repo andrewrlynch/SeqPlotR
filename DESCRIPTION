@@ -1,0 +1,33 @@
+Package: SeqPlotR
+Title: Genomic Visualization with a Layered Grammar
+Version: 0.1.0
+Authors@R: person("First", "Last", email = "email@example.com", role = c("aut", "cre"))
+Description: A flexible R6-based genomic visualization package with ggplot2-inspired syntax.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+Depends: R (>= 4.1.0)
+Imports:
+    R6,
+    GenomicRanges,
+    IRanges,
+    S4Vectors,
+    BiocGenerics,
+    grid,
+    stats,
+    grDevices
+Suggests:
+    testthat (>= 3.0.0),
+    devtools,
+    knitr,
+    rmarkdown,
+    GenomeInfoDb,
+    GenomicAlignments,
+    Rsamtools,
+    rtracklayer,
+    strawr,
+    rhdf5
+VignetteBuilder: knitr
+Config/testthat/edition: 3
