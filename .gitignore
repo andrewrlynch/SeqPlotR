@@ -11,3 +11,5 @@ README_CLAUDE.md
 .httr-oauth
 .DS_Store
 .quarto
+docs
+/vignettes/seqplotr.Rmd

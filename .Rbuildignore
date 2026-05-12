@@ -10,3 +10,8 @@
 ^doc$
 ^Meta$
 ^.*\.Rproj$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
+^\.github$
+^vignettes/seqplotr\.Rmd$
