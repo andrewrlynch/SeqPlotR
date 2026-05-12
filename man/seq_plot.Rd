@@ -9,6 +9,9 @@ seq_plot(
   aesthetics = aes(),
   show_legend = TRUE,
   legend = NULL,
+  windows = NULL,
+  plot_margin = 0.02,
+  highlight_margins = FALSE,
   ...
 )
 }
@@ -25,6 +28,18 @@ drawn regardless of element or track settings. Default \code{TRUE}.}
 
 \item{legend}{Convenience alias: \code{legend = FALSE} is sugar for
 \code{show_legend = FALSE}. All other values are ignored.}
+
+\item{windows}{Optional plot-wide \code{GRanges}. Tracks that do not set
+their own \code{windows} (and genomic scales nested in them) inherit
+from this value.}
+
+\item{plot_margin}{Numeric. Outermost canvas margin in NPC units
+(default \code{0.02}). Per-side overrides via
+\verb{aesthetics = aes(margins = list(top = …, …))} still win.}
+
+\item{highlight_margins}{Logical. When \code{TRUE}, overlay translucent
+coloured rects on every margin band — a development aid. Default
+\code{FALSE}.}
 
 \item{...}{Additional arguments reserved for future use.}
 }

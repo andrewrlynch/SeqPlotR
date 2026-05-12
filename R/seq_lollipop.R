@@ -55,9 +55,11 @@ SeqLollipopR6 <- R6::R6Class("SeqLollipop",
         xs <- x_vals[idx]
         ys <- y_vals[idx]
 
-        u  <- pmax(pmin((xs       - pm$xscale[1]) / diff(pm$xscale), 1), 0)
-        v1 <- pmax(pmin((ys       - pm$yscale[1]) / diff(pm$yscale), 1), 0)
-        v0 <- pmax(pmin((baseline - pm$yscale[1]) / diff(pm$yscale), 1), 0)
+        xpr <- pm$xplot_range %||% pm$xscale
+        ypr <- pm$yplot_range %||% pm$yscale
+        u  <- pmax(pmin((xs       - xpr[1]) / diff(xpr), 1), 0)
+        v1 <- pmax(pmin((ys       - ypr[1]) / diff(ypr), 1), 0)
+        v0 <- pmax(pmin((baseline - ypr[1]) / diff(ypr), 1), 0)
 
         xw <- pm$inner$x1 - pm$inner$x0
         yw <- pm$inner$y1 - pm$inner$y0

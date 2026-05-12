@@ -278,11 +278,14 @@
       y0_sub <- y_cur
       y1_sub <- y_cur + y_rel[k] * h_total
       y_cur  <- y1_sub
+      ys_k <- c(BiocGenerics::start(y_win[k]),
+                BiocGenerics::end(y_win[k]))
       y_sub_panels_default[[k]] <- list(
         y0      = y0_sub,
         y1      = y1_sub,
-        yscale  = c(BiocGenerics::start(y_win[k]),
-                    BiocGenerics::end(y_win[k])),
+        yscale  = ys_k,
+        yplot_range = if (!is.null(track$scale_y))
+          .compute_scale_breaks(track$scale_y, ys_k)$plot_range else ys_k,
         seqname = as.character(GenomicRanges::seqnames(y_win[k]))
       )
     }
@@ -305,6 +308,15 @@
 
   panels <- vector("list", nWin)
   x_cur  <- track_inner$x0
+  # Pre-compute oob modes (default exclude) from the scales.
+  x_oob  <- if (!is.null(track$scale_x)  && !is.null(track$scale_x$oob))
+              track$scale_x$oob  else "exclude"
+  y_oob  <- if (!is.null(track$scale_y)  && !is.null(track$scale_y$oob))
+              track$scale_y$oob  else "exclude"
+  x_oob2 <- if (!is.null(track$scale_x2) && !is.null(track$scale_x2$oob))
+              track$scale_x2$oob else "exclude"
+  y_oob2 <- if (!is.null(track$scale_y2) && !is.null(track$scale_y2$oob))
+              track$scale_y2$oob else "exclude"
   for (w in seq_len(nWin)) {
     w_width <- ww$rel[w] * plot_w
     px0 <- x_cur
@@ -315,6 +327,20 @@
     plot_area    <- shrink(window_outer, wim)  # after window_inner_margin
     xscale_w  <- .compute_track_xscale(track, win, w)
     xscale2_w <- .scale_to_xrange(track$scale_x2, win, w)
+
+    # Compute the expanded plot range that elements should map against.
+    xplot_range_w <- if (!is.null(track$scale_x))
+      .compute_scale_breaks(track$scale_x, xscale_w)$plot_range
+      else xscale_w
+    yplot_range_w <- if (!is.null(track$scale_y))
+      .compute_scale_breaks(track$scale_y, yscale)$plot_range
+      else yscale
+    xplot_range2_w <- if (!is.null(track$scale_x2) && !is.null(xscale2_w))
+      .compute_scale_breaks(track$scale_x2, xscale2_w)$plot_range
+      else xscale2_w
+    yplot_range2_w <- if (!is.null(track$scale_y2) && !is.null(yscale2))
+      .compute_scale_breaks(track$scale_y2, yscale2)$plot_range
+      else yscale2
 
     panels[[w]] <- list(
       track               = track_key,
@@ -334,6 +360,14 @@
       yscale              = yscale,
       xscale2             = xscale2_w,
       yscale2             = yscale2,
+      xplot_range         = xplot_range_w,
+      yplot_range         = yplot_range_w,
+      xplot_range2        = xplot_range2_w,
+      yplot_range2        = yplot_range2_w,
+      x_oob               = x_oob,
+      y_oob               = y_oob,
+      x_oob2              = x_oob2,
+      y_oob2              = y_oob2,
       data_x              = xscale_w,
       data_y              = yscale,
       xScaleFactor        = ww$scale[[w]],
@@ -376,6 +410,19 @@
         panels <- lapply(panels, function(p) { p$x_break_step <- step; p })
       }
     }
+  }
+
+  # When the scale has an explicit unit, override the auto-inferred scale
+  # factors so axis label formatting uses the requested unit.
+  if (!is.null(track$scale_x) && inherits(track$scale_x, "SeqScaleGenomic") &&
+      !is.null(track$scale_x$unit)) {
+    unit_sf <- switch(track$scale_x$unit, Mb = 1e-6, Kb = 1e-3, bp = 1)
+    for (k in seq_along(panels)) panels[[k]]$xScaleFactor <- unit_sf
+  }
+  if (!is.null(track$scale_y) && inherits(track$scale_y, "SeqScaleGenomic") &&
+      !is.null(track$scale_y$unit)) {
+    unit_sf <- switch(track$scale_y$unit, Mb = 1e-6, Kb = 1e-3, bp = 1)
+    for (k in seq_along(panels)) panels[[k]]$yScaleFactor <- unit_sf
   }
 
   panels

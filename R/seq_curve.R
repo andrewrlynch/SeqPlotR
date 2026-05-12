@@ -51,14 +51,12 @@ SeqCurveR6 <- R6::R6Class("SeqCurve",
         panel_meta <- layout_track[[w]]
         idx <- qh[mask]
 
-        u0 <- pmax(pmin((x0_vals[idx] - panel_meta$xscale[1]) /
-                          diff(panel_meta$xscale), 1), 0)
-        u1 <- pmax(pmin((x1_vals[idx] - panel_meta$xscale[1]) /
-                          diff(panel_meta$xscale), 1), 0)
-        v0 <- pmax(pmin((y0_vals[idx] - panel_meta$yscale[1]) /
-                          diff(panel_meta$yscale), 1), 0)
-        v1 <- pmax(pmin((y1_vals[idx] - panel_meta$yscale[1]) /
-                          diff(panel_meta$yscale), 1), 0)
+        xpr <- panel_meta$xplot_range %||% panel_meta$xscale
+        ypr <- panel_meta$yplot_range %||% panel_meta$yscale
+        u0 <- pmax(pmin((x0_vals[idx] - xpr[1]) / diff(xpr), 1), 0)
+        u1 <- pmax(pmin((x1_vals[idx] - xpr[1]) / diff(xpr), 1), 0)
+        v0 <- pmax(pmin((y0_vals[idx] - ypr[1]) / diff(ypr), 1), 0)
+        v1 <- pmax(pmin((y1_vals[idx] - ypr[1]) / diff(ypr), 1), 0)
 
         xw <- panel_meta$inner$x1 - panel_meta$inner$x0
         yw <- panel_meta$inner$y1 - panel_meta$inner$y0

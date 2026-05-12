@@ -64,9 +64,11 @@ SeqRibbonR6 <- R6::R6Class("SeqRibbon",
         ylo <- ylo[ord]
         yhi <- yhi[ord]
 
-        u    <- pmax(pmin((xs  - pm$xscale[1]) / diff(pm$xscale), 1), 0)
-        v_lo <- pmax(pmin((ylo - pm$yscale[1]) / diff(pm$yscale), 1), 0)
-        v_hi <- pmax(pmin((yhi - pm$yscale[1]) / diff(pm$yscale), 1), 0)
+        xpr <- pm$xplot_range %||% pm$xscale
+        ypr <- pm$yplot_range %||% pm$yscale
+        u    <- pmax(pmin((xs  - xpr[1]) / diff(xpr), 1), 0)
+        v_lo <- pmax(pmin((ylo - ypr[1]) / diff(ypr), 1), 0)
+        v_hi <- pmax(pmin((yhi - ypr[1]) / diff(ypr), 1), 0)
 
         xw <- pm$inner$x1 - pm$inner$x0
         yw <- pm$inner$y1 - pm$inner$y0

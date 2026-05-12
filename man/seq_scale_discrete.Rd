@@ -8,7 +8,9 @@ seq_scale_discrete(
   levels = NULL,
   labels = NULL,
   expand = c(0, 0.5),
-  cap = c("capped", "full", "exact", "ticks")
+  cap = c("capped", "full", "exact", "ticks"),
+  oob = c("exclude", "perimeter"),
+  pretty = NULL
 )
 }
 \arguments{

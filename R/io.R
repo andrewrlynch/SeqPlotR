@@ -299,18 +299,21 @@ print.SeqBam <- function(x, ...) {
 #'
 #' Creates a lightweight connection object that probes the Juicer
 #' header (chromosomes and resolutions) and exposes a
-#' `$fetch(region1, region2, ...)` method returning a `data.frame` of
-#' contact pairs.
+#' `$fetch(region, ...)` method returning a `data.frame` of contact
+#' pairs. The `region` argument may contain multiple genomic ranges;
+#' each range yields its own intra-region contact submatrix and the
+#' results are concatenated.
 #'
 #' @param path Character. Path to a Juicer `.hic` file.
 #' @param resolution Integer. Default bin resolution in bp. May be
 #'   omitted at construction and supplied to `$fetch()`.
-#' @param max_fetch_bp Integer. Maximum genomic span per `$fetch()` call.
-#'   Default `5e6` (5 Mb).
+#' @param max_fetch_bp Integer. Maximum genomic span per range in a
+#'   single `$fetch()` call. Default `2.8e8` (280 Mb). Each range in
+#'   the input GRanges is checked independently.
 #' @return A `SeqHic` S3 object with `chromosomes`, `resolutions`,
 #'   `max_fetch_bp`, and a `fetch()` closure.
 #' @export
-open_hic <- function(path, resolution = NULL, max_fetch_bp = 5e6L) {
+open_hic <- function(path, resolution = NULL, max_fetch_bp = 280000000L) {
   if (!file.exists(path))
     stop("File not found: ", path, call. = FALSE)
   if (!requireNamespace("strawr", quietly = TRUE))
@@ -334,61 +337,59 @@ open_hic <- function(path, resolution = NULL, max_fetch_bp = 5e6L) {
     resolutions  = resolutions
   )
 
-  obj$fetch <- function(region1, region2 = NULL,
+  obj$fetch <- function(region,
                         resolution = obj$resolution,
                         norm       = "NONE",
                         unit       = "BP",
                         matrix     = "observed") {
     if (is.null(resolution))
       stop("A `resolution` must be specified for $fetch().", call. = FALSE)
-    if (!inherits(region1, "GRanges") || length(region1) != 1L)
-      stop("`region1` must be a single-range GRanges.", call. = FALSE)
-    if (is.null(region2)) region2 <- region1
+    if (!inherits(region, "GRanges") || length(region) < 1L)
+      stop("`region` must be a GRanges with at least one range.",
+           call. = FALSE)
 
-    total_bp <- max(BiocGenerics::width(region1),
-                    BiocGenerics::width(region2))
-    if (total_bp > obj$max_fetch_bp)
-      stop(sprintf(
-        "Requested region spans %s bp but max_fetch_bp = %s. ",
-        format(total_bp, big.mark = ","),
-        format(obj$max_fetch_bp, big.mark = ",")),
-        "Narrow your windows or increase max_fetch_bp with care.",
-        call. = FALSE)
-
-    chr1 <- as.character(GenomicRanges::seqnames(region1))
-    chr2 <- as.character(GenomicRanges::seqnames(region2))
-
-    loc1 <- sprintf("%s:%d:%d", chr1,
-                    BiocGenerics::start(region1),
-                    BiocGenerics::end(region1))
-    loc2 <- sprintf("%s:%d:%d", chr2,
-                    BiocGenerics::start(region2),
-                    BiocGenerics::end(region2))
-
-    raw <- strawr::straw(
-      norm    = norm,
-      fname   = obj$path,
-      chr1loc = loc1,
-      chr2loc = loc2,
-      unit    = unit,
-      binsize = as.integer(resolution),
-      matrix  = matrix
-    )
-    if (is.null(raw) || nrow(raw) == 0L) return(data.frame())
-
-    data.frame(
-      seqnames1 = chr1,
-      start1    = raw$x,
-      end1      = raw$x + as.integer(resolution) - 1L,
-      seqnames2 = chr2,
-      start2    = raw$y,
-      end2      = raw$y + as.integer(resolution) - 1L,
-      score     = raw$counts,
-      stringsAsFactors = FALSE
-    )
+    out <- vector("list", length(region))
+    for (i in seq_along(region)) {
+      r_i <- region[i]
+      w_i <- BiocGenerics::width(r_i)
+      if (w_i > obj$max_fetch_bp)
+        stop(sprintf(
+          "Requested range %d spans %s bp but max_fetch_bp = %s. ",
+          i, format(w_i, big.mark = ","),
+          format(obj$max_fetch_bp, big.mark = ",")),
+          "Narrow your windows or increase max_fetch_bp with care.",
+          call. = FALSE)
+      chr_i <- as.character(GenomicRanges::seqnames(r_i))
+      loc_i <- sprintf("%s:%d:%d", chr_i,
+                       BiocGenerics::start(r_i),
+                       BiocGenerics::end(r_i))
+      raw <- strawr::straw(
+        norm    = norm,
+        fname   = obj$path,
+        chr1loc = loc_i,
+        chr2loc = loc_i,
+        unit    = unit,
+        binsize = as.integer(resolution),
+        matrix  = matrix
+      )
+      if (is.null(raw) || nrow(raw) == 0L) next
+      out[[i]] <- data.frame(
+        seqnames1 = chr_i,
+        start1    = raw$x,
+        end1      = raw$x + as.integer(resolution) - 1L,
+        seqnames2 = chr_i,
+        start2    = raw$y,
+        end2      = raw$y + as.integer(resolution) - 1L,
+        score     = raw$counts,
+        stringsAsFactors = FALSE
+      )
+    }
+    out <- Filter(Negate(is.null), out)
+    if (length(out) == 0L) return(data.frame())
+    do.call(rbind, out)
   }
 
-  obj$fetch_binned <- function(region1, region2 = NULL,
+  obj$fetch_binned <- function(region,
                                bin_size   = NULL,
                                fun        = "mean",
                                resolution = obj$resolution,
@@ -400,8 +401,7 @@ open_hic <- function(path, resolution = NULL, max_fetch_bp = 5e6L) {
       stop("A `resolution` must be specified.", call. = FALSE)
 
     contacts <- obj$fetch(
-      region1    = region1,
-      region2    = region2,
+      region     = region,
       resolution = resolution,
       norm       = norm,
       unit       = unit,
@@ -653,7 +653,7 @@ print.SeqH5 <- function(x, ...) {
   else
     as.character(x$resolution)
   cat(sprintf(
-    "<%s>  %s\n  chromosomes: %d\n  resolution(s) (bp): %s\n  max_fetch_bp: %s\n  methods: $fetch(region1, region2, resolution)  $fetch_binned(..., bin_size, fun)\n",
+    "<%s>  %s\n  chromosomes: %d\n  resolution(s) (bp): %s\n  max_fetch_bp: %s\n  methods: $fetch(region, resolution)  $fetch_binned(..., bin_size, fun)\n",
     if (x$is_mcool) "SeqH5 [mcool]" else "SeqH5 [cool]",
     x$path,
     nrow(x$chromosomes),

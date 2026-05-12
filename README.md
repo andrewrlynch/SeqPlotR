@@ -1,7 +1,9 @@
-# SeqPlotR — Project Document
+# SeqPlotR
 
-**Version:** 1.0  
-**Status:** Approved for implementation
+## 0. Installation from GitHub
+```
+pak::pak("andrewrlynch/SeqPlotR")
+```
 
 ---
 
@@ -622,43 +624,3 @@ Builds a `seq_plot` with one track:
 Builds a `seq_plot` with one track (signal) and optionally a second track (genes):
 - `seq_area` for coverage signal, with `map(x = start, y = score)` auto-detected or user-overridden via `...`
 - If `show_genes` is a `GRanges`, appends a second track via `%__%` with `seq_gene(data = show_genes)`
-
----
-
-## 9. Testing Strategy
-
-Tests are organized by concern, not by element. Each test file covers one logical concern across all elements that participate in it.
-
-| File | Coverage |
-|------|---------|
-| `test-operators.R` | All four operators, context switching, error cases, chaining |
-| `test-layout.R` | Positional row/col math, patchwork parsing, non-rectangular error, `#` cells, multi-row/col spanning |
-| `test-mapping.R` | `map()` special fields, arbitrary expressions, inheritance priority, `aes()` constant resolution |
-| `test-elements.R` | `prep()` + `draw()` round-trip for all elements on synthetic GRanges |
-| `test-links.R` | Within-track link locking (t0==t1 forced), cross-track coordinate resolution per-track scale, plot-level deferred link drawing, all link types on synthetic two-track layout |
-| `test-wrappers.R` | Each wrapper renders without error on minimal synthetic data |
-| `test-preview.R` | `seq_preview_layout()` produces correct npc bounds for known layout strings |
-
----
-
-## 10. Design Constraints (Non-Negotiable)
-
-1. All rendering in a single `grid` viewport — no `facet`-style multi-viewport approaches
-2. `windows` is a `seq_track`-only argument — elements cannot define their own windows
-3. Out-of-bounds element data is silently clipped — no warnings
-4. `seq_blank()` renders nothing — no background rectangle, no border
-5. `seq_hic()` rotation is coordinate-transform only — no `grid` viewport rotation
-6. `seq_density()` computes density internally — pre-computed density data should use `seq_area()` directly
-7. `seq_gene()` is format-agnostic — no assumed column names; all fields specified via `map()`
-8. No PascalCase aliases — clean break from THEfunc
-9. `seq_link` placement inside `seq_track` locks `t0`/`t1` to the parent track — no override
-10. Plot-level links and annotations are deferred and drawn last, after all tracks are laid out
-11. Track references in `t0`/`t1` use `track_id` string; integer index accepted as fallback
-12. All link anchor data is encoded in a single `data` object using the BEDPE-style `map()` field vocabulary — no `data2`/`mapping2` fields
-13. `seq_annotation()` is a placeholder — full API to be defined in a future iteration
-14. `%+%` is the primary operator; `%|%` and `%__%` are convenience aliases
-15. Plot-level `SeqLink` via `%+%` validates that both `t0` and `t1` resolve to already-added tracks
-16. All theme control uses the dotted-key namespace (`axis.x.line.col`, `track.background.fill`, etc.) — legacy flat names (`xAxisLine`, `axisColor`, `trackBackground`, etc.) are no longer accepted; hard break
-17. `SeqPlotR6` uses `flat_theme` (not `defaultAesthetics`) for plot-wide theme defaults
-18. Secondary axis assignment is via `map(axis.y=2)` / `map(axis.x=2)` — up to 4 axes per track (x1/x2/y1/y2)
-19. `drawElements()` remaps panels per element via `.panels_for_element()` to route primary/secondary axis elements to the correct scale

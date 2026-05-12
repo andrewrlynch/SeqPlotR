@@ -61,10 +61,15 @@ SeqAreaR6 <- R6::R6Class("SeqArea",
         ord <- if (sort_axis == "y") order(y_vals[idx]) else order(x_vals[idx])
         idx <- idx[ord]
 
-        u <- pmax(pmin((x_vals[idx] - panel_meta$xscale[1]) /
-                         diff(panel_meta$xscale), 1), 0)
-        v <- pmax(pmin((y_vals[idx] - panel_meta$yscale[1]) /
-                         diff(panel_meta$yscale), 1), 0)
+        xpr <- panel_meta$xplot_range %||% panel_meta$xscale
+        ypr <- panel_meta$yplot_range %||% panel_meta$yscale
+        oob <- .apply_oob(x_vals[idx], y_vals[idx], xpr, ypr,
+                          mode = panel_meta$x_oob %||% "exclude",
+                          label = "seq_area")
+        idx_k <- idx[oob$keep]
+        x_k <- oob$x; y_k <- oob$y
+        u <- (x_k - xpr[1]) / diff(xpr)
+        v <- (y_k - ypr[1]) / diff(ypr)
         xw <- panel_meta$inner$x1 - panel_meta$inner$x0
         yw <- panel_meta$inner$y1 - panel_meta$inner$y0
         x_canvas <- panel_meta$inner$x0 + u * xw
@@ -73,16 +78,14 @@ SeqAreaR6 <- R6::R6Class("SeqArea",
         if (sort_axis == "y") {
           # Flipped orientation: baseline is a value on the scalar x-axis,
           # closing the polygon with a vertical return path.
-          base_u <- pmax(pmin((baseline - panel_meta$xscale[1]) /
-                                diff(panel_meta$xscale), 1), 0)
+          base_u <- pmax(pmin((baseline - xpr[1]) / diff(xpr), 1), 0)
           base_canvas <- panel_meta$inner$x0 + base_u * xw
           x_poly <- c(x_canvas, rep(base_canvas, length(x_canvas)))
           y_poly <- c(y_canvas, rev(y_canvas))
         } else {
           # Conventional orientation: baseline on the scalar y-axis,
           # horizontal return path.
-          base_v <- pmax(pmin((baseline - panel_meta$yscale[1]) /
-                                diff(panel_meta$yscale), 1), 0)
+          base_v <- pmax(pmin((baseline - ypr[1]) / diff(ypr), 1), 0)
           base_canvas <- panel_meta$inner$y0 + base_v * yw
           x_poly <- c(x_canvas, rev(x_canvas))
           y_poly <- c(y_canvas, rep(base_canvas, length(y_canvas)))

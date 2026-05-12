@@ -5,13 +5,15 @@
 \title{Genomic position scale}
 \usage{
 seq_scale_genomic(
-  windows,
+  windows = NULL,
   scale_factor = NULL,
   breaks = NULL,
   minor_breaks = NULL,
   expand = c(0, 0),
   cap = c("capped", "full", "exact", "ticks"),
-  labels = NULL
+  labels = NULL,
+  oob = c("exclude", "perimeter"),
+  pretty = NULL
 )
 }
 \arguments{
@@ -37,6 +39,15 @@ unexpanded data range), or \code{"ticks"} (no axis line, only ticks).}
 
 \item{labels}{Optional character vector of tick labels (same length as
 \code{breaks}). If \code{NULL}, breaks are formatted as decimal numbers.}
+
+\item{oob}{One of \code{"exclude"} (default — out-of-bounds data rows are
+dropped before the npc transform; a \code{message()} reports the count)
+or \code{"perimeter"} (clamped to the axis limits and counted).}
+
+\item{pretty}{Optional named list of arguments forwarded to base
+\code{\link[=pretty]{pretty()}} (e.g. \code{list(min.n = 2, high.u.bias = 0)}). Names that
+are not base \code{pretty()} arguments (such as \code{bounds} or \code{f.min}) will
+error from R.}
 }
 \value{
 A \code{SeqScaleGenomic} / \code{SeqPositionScale} object.

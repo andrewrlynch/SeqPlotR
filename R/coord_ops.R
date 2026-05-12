@@ -355,3 +355,69 @@
   }
   c(0, 1)
 }
+
+#' Apply an out-of-bounds policy to (x, y) coordinates
+#'
+#' Filters or clamps `(x, y)` values that fall outside the (expanded) plot
+#' range. The mode is set per-scale via `seq_scale_*(oob = ...)`.
+#'
+#' @param x,y Numeric vectors of equal length. `y` may be `NULL` for
+#'   elements with only an x dimension.
+#' @param plot_range_x,plot_range_y Length-2 numeric vectors of the
+#'   expanded plot range. `plot_range_y` may be `NULL`.
+#' @param mode One of `"exclude"` (drop OOB rows; default) or
+#'   `"perimeter"` (clamp to the limit).
+#' @param label Optional character used in the emitted message.
+#' @return A list with components:
+#'   \describe{
+#'     \item{`x`,`y`}{the filtered or clamped coordinates}
+#'     \item{`keep`}{logical mask of which input rows survived
+#'       (always `TRUE` for `perimeter`)}
+#'     \item{`n_oob`}{integer count of rows that were out of bounds}
+#'   }
+#' @keywords internal
+.apply_oob <- function(x, y = NULL,
+                       plot_range_x, plot_range_y = NULL,
+                       mode = c("exclude", "perimeter"),
+                       label = "") {
+  mode <- match.arg(mode)
+  n <- length(x)
+  oob_x <- if (!is.null(plot_range_x) && length(plot_range_x) == 2L &&
+               all(is.finite(plot_range_x))) {
+    is.finite(x) & (x < plot_range_x[1] | x > plot_range_x[2])
+  } else rep(FALSE, n)
+  oob_y <- if (!is.null(y) && !is.null(plot_range_y) &&
+               length(plot_range_y) == 2L && all(is.finite(plot_range_y))) {
+    is.finite(y) & (y < plot_range_y[1] | y > plot_range_y[2])
+  } else rep(FALSE, n)
+  oob <- oob_x | oob_y
+  n_oob <- sum(oob, na.rm = TRUE)
+
+  if (n_oob > 0L && !isTRUE(getOption("seqplotr.suppress_oob", FALSE))) {
+    verb <- if (mode == "exclude") "excluded" else "plotted"
+    lbl  <- if (nzchar(label)) paste0(" (", label, ")") else ""
+    message(n_oob, " out-of-bounds data points ", verb, "!", lbl)
+  }
+
+  if (mode == "exclude") {
+    keep <- !oob
+    list(
+      x = x[keep],
+      y = if (!is.null(y)) y[keep] else NULL,
+      keep = keep,
+      n_oob = n_oob
+    )
+  } else {
+    xc <- if (!is.null(plot_range_x) && length(plot_range_x) == 2L)
+      pmin(pmax(x, plot_range_x[1]), plot_range_x[2]) else x
+    yc <- if (!is.null(y) && !is.null(plot_range_y) &&
+              length(plot_range_y) == 2L)
+      pmin(pmax(y, plot_range_y[1]), plot_range_y[2]) else y
+    list(
+      x = xc,
+      y = yc,
+      keep = rep(TRUE, n),
+      n_oob = n_oob
+    )
+  }
+}

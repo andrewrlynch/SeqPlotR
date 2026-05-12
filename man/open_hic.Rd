@@ -4,7 +4,7 @@
 \alias{open_hic}
 \title{Open a \code{.hic} file connection (Juicer format)}
 \usage{
-open_hic(path, resolution = NULL, max_fetch_bp = 5000000L)
+open_hic(path, resolution = NULL, max_fetch_bp = 280000000L)
 }
 \arguments{
 \item{path}{Character. Path to a Juicer \code{.hic} file.}
@@ -12,8 +12,9 @@ open_hic(path, resolution = NULL, max_fetch_bp = 5000000L)
 \item{resolution}{Integer. Default bin resolution in bp. May be
 omitted at construction and supplied to \verb{$fetch()}.}
 
-\item{max_fetch_bp}{Integer. Maximum genomic span per \verb{$fetch()} call.
-Default \code{5e6} (5 Mb).}
+\item{max_fetch_bp}{Integer. Maximum genomic span per range in a
+single \verb{$fetch()} call. Default \code{2.8e8} (280 Mb). Each range in
+the input GRanges is checked independently.}
 }
 \value{
 A \code{SeqHic} S3 object with \code{chromosomes}, \code{resolutions},
@@ -22,6 +23,8 @@ A \code{SeqHic} S3 object with \code{chromosomes}, \code{resolutions},
 \description{
 Creates a lightweight connection object that probes the Juicer
 header (chromosomes and resolutions) and exposes a
-\verb{$fetch(region1, region2, ...)} method returning a \code{data.frame} of
-contact pairs.
+\verb{$fetch(region, ...)} method returning a \code{data.frame} of contact
+pairs. The \code{region} argument may contain multiple genomic ranges;
+each range yields its own intra-region contact submatrix and the
+results are concatenated.
 }

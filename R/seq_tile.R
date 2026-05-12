@@ -100,8 +100,9 @@ SeqTileR6 <- R6::R6Class("SeqTile",
             j_seq <- NULL
           }
 
-          u0 <- pmax(pmin((x0_g  - pm$xscale[1]) / diff(pm$xscale), 1), 0)
-          u1 <- pmax(pmin((x1_g  - pm$xscale[1]) / diff(pm$xscale), 1), 0)
+          xpr <- pm$xplot_range %||% pm$xscale
+          u0 <- pmax(pmin((x0_g  - xpr[1]) / diff(xpr), 1), 0)
+          u1 <- pmax(pmin((x1_g  - xpr[1]) / diff(xpr), 1), 0)
           xw <- pm$inner$x1 - pm$inner$x0
           x0c <- pm$inner$x0 + u0 * xw
           x1c <- pm$inner$x0 + u1 * xw
@@ -116,7 +117,7 @@ SeqTileR6 <- R6::R6Class("SeqTile",
               sub  <- y_subs[[yk]]
               ymask <- j_seq == sub$seqname
               if (!any(ymask)) next
-              ys <- sub$yscale
+              ys <- sub$yplot_range %||% sub$yscale
               v0 <- pmax(pmin((y0_gu[ymask] - ys[1]) / diff(ys), 1), 0)
               v1 <- pmax(pmin((y1_gu[ymask] - ys[1]) / diff(ys), 1), 0)
               y0c <- sub$y0 + v0 * (sub$y1 - sub$y0)
@@ -134,8 +135,9 @@ SeqTileR6 <- R6::R6Class("SeqTile",
             frames <- Filter(Negate(is.null), frames)
             df_w <- if (length(frames)) do.call(rbind, frames) else NULL
           } else {
-            v0 <- pmax(pmin((y0_gu - pm$yscale[1]) / diff(pm$yscale), 1), 0)
-            v1 <- pmax(pmin((y1_gu - pm$yscale[1]) / diff(pm$yscale), 1), 0)
+            ypr <- pm$yplot_range %||% pm$yscale
+            v0 <- pmax(pmin((y0_gu - ypr[1]) / diff(ypr), 1), 0)
+            v1 <- pmax(pmin((y1_gu - ypr[1]) / diff(ypr), 1), 0)
             yw <- pm$inner$y1 - pm$inner$y0
             y0c <- pm$inner$y0 + v0 * yw
             y1c <- pm$inner$y0 + v1 * yw
@@ -187,10 +189,12 @@ SeqTileR6 <- R6::R6Class("SeqTile",
           # panel edge must keep their true corner positions so the
           # diamond shape survives. Clipping happens at draw() time via
           # a clipped viewport.
+          xpr <- pm$xplot_range %||% pm$xscale
+          ypr <- pm$yplot_range %||% pm$yscale
           to_x_npc <- function(v)
-            pm$inner$x0 + (v - pm$xscale[1]) / diff(pm$xscale) * xw
+            pm$inner$x0 + (v - xpr[1]) / diff(xpr) * xw
           to_y_npc <- function(v)
-            pm$inner$y0 + (v - pm$yscale[1]) / diff(pm$yscale) * yw
+            pm$inner$y0 + (v - ypr[1]) / diff(ypr) * yw
 
           # Skip tiles whose bounding box is entirely outside the panel
           # in either axis — they contribute nothing visible.

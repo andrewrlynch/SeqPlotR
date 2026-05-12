@@ -62,14 +62,29 @@ SeqSegmentR6 <- R6::R6Class("SeqSegment",
         panel_meta <- layout_track[[w]]
         idx <- qh[mask]
 
-        u0 <- pmax(pmin((x0_vals[idx] - panel_meta$xscale[1]) /
-                          diff(panel_meta$xscale), 1), 0)
-        u1 <- pmax(pmin((x1_vals[idx] - panel_meta$xscale[1]) /
-                          diff(panel_meta$xscale), 1), 0)
-        v0 <- pmax(pmin((y0_vals[idx] - panel_meta$yscale[1]) /
-                          diff(panel_meta$yscale), 1), 0)
-        v1 <- pmax(pmin((y1_vals[idx] - panel_meta$yscale[1]) /
-                          diff(panel_meta$yscale), 1), 0)
+        xpr <- panel_meta$xplot_range %||% panel_meta$xscale
+        ypr <- panel_meta$yplot_range %||% panel_meta$yscale
+        mode <- panel_meta$x_oob %||% "exclude"
+        # A segment is OOB iff *both* anchors fall outside the plot range.
+        x_in <- (pmax(x0_vals[idx], x1_vals[idx]) >= xpr[1]) &
+                (pmin(x0_vals[idx], x1_vals[idx]) <= xpr[2])
+        y_in <- (pmax(y0_vals[idx], y1_vals[idx]) >= ypr[1]) &
+                (pmin(y0_vals[idx], y1_vals[idx]) <= ypr[2])
+        in_range <- x_in & y_in
+        n_oob <- sum(!in_range, na.rm = TRUE)
+        if (n_oob > 0L && !isTRUE(getOption("seqplotr.suppress_oob", FALSE))) {
+          verb <- if (mode == "exclude") "excluded" else "plotted"
+          message(n_oob, " out-of-bounds data points ", verb, "! (seq_segment)")
+        }
+        if (mode == "exclude") {
+          idx <- idx[in_range]
+        }
+        x0i <- x0_vals[idx]; x1i <- x1_vals[idx]
+        y0i <- y0_vals[idx]; y1i <- y1_vals[idx]
+        u0 <- pmax(pmin((x0i - xpr[1]) / diff(xpr), 1), 0)
+        u1 <- pmax(pmin((x1i - xpr[1]) / diff(xpr), 1), 0)
+        v0 <- pmax(pmin((y0i - ypr[1]) / diff(ypr), 1), 0)
+        v1 <- pmax(pmin((y1i - ypr[1]) / diff(ypr), 1), 0)
 
         xw <- panel_meta$inner$x1 - panel_meta$inner$x0
         yw <- panel_meta$inner$y1 - panel_meta$inner$y0

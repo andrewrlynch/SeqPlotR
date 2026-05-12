@@ -31,6 +31,16 @@ SeqPlotR6 <- R6::R6Class("SeqPlot",
     #' @field show_legend Logical. Global legend switch. When `FALSE`, no legend
     #'   output is produced for any track. Default `TRUE`.
     show_legend       = TRUE,
+    #' @field windows Optional plot-wide `GRanges`. Inherited by any track
+    #'   whose `windows` is `NULL`. Genomic scales without explicit
+    #'   `windows` also inherit from their enclosing track.
+    windows           = NULL,
+    #' @field plot_margin Scalar (or length-4 `c(b, l, t, r)`) used as the
+    #'   outermost canvas margin. Defaults to 0.02.
+    plot_margin       = 0.02,
+    #' @field highlight_margins Logical. When `TRUE`, draw translucent
+    #'   overlays on every margin band — a development aid.
+    highlight_margins = FALSE,
 
     #' @description Construct a SeqPlotR6.
     #' @param layout Either NULL (positional layout, default) or a multiline
@@ -42,15 +52,25 @@ SeqPlotR6 <- R6::R6Class("SeqPlot",
     #' @param show_legend Logical. Global legend switch. Default `TRUE`.
     #' @param legend Convenience argument. `legend = FALSE` is sugar for
     #'   `show_legend = FALSE`. All other values are ignored.
+    #' @param windows Optional plot-wide `GRanges`. Tracks that omit
+    #'   `windows` inherit from this value.
+    #' @param plot_margin Numeric. Outermost canvas margin (default 0.02).
+    #' @param highlight_margins Logical. Draw translucent margin overlays
+    #'   for development (default FALSE).
     #' @param ... Additional arguments (currently ignored).
     initialize = function(layout = NULL, aesthetics = aes(),
                           tracks = list(), show_legend = TRUE,
-                          legend = NULL, ...) {
-      self$aesthetics       <- aesthetics
-      self$plot_links       <- list()
-      self$plot_annotations <- list()
-      self$show_legend      <- if (identical(legend, FALSE)) FALSE
-                               else isTRUE(show_legend)
+                          legend = NULL, windows = NULL,
+                          plot_margin = 0.02,
+                          highlight_margins = FALSE, ...) {
+      self$aesthetics        <- aesthetics
+      self$plot_links        <- list()
+      self$plot_annotations  <- list()
+      self$show_legend       <- if (identical(legend, FALSE)) FALSE
+                                else isTRUE(show_legend)
+      self$windows           <- windows
+      self$plot_margin       <- plot_margin
+      self$highlight_margins <- isTRUE(highlight_margins)
       if (is.null(layout)) {
         # Pre-populate positional rows from the tracks argument if supplied.
         if (length(tracks) > 0L) {
@@ -112,21 +132,27 @@ SeqPlotR6 <- R6::R6Class("SeqPlot",
     #'   `.build_patchwork_layout()` and opens a `grid` viewport.
     #' @return The plot, invisibly.
     layoutGrid = function() {
-      plot_theme_user <- .flatten_theme(self$aesthetics)
+      plot_theme_user <- .normalize_blanks(.flatten_theme(self$aesthetics))
       plot_flat <- .merge_themes(.default_theme(), plot_theme_user)
       self$flat_theme <- plot_flat
 
       all_trks <- self$allTracks()
+      # Inherit plot-level windows when a track did not supply its own.
+      for (trk in all_trks) {
+        if (is.null(trk$windows) && !is.null(self$windows))
+          trk$windows <- self$windows
+      }
       for (trk in all_trks) {
         if (is.null(trk$windows))
           stop("seq_track() is missing 'windows'. ",
-               "Every track must have windows defined.", call. = FALSE)
+               "Provide windows either to the track or to seq_plot().",
+               call. = FALSE)
       }
 
       # Per-track resolved theme (plot + track-level overrides).
       for (trk in all_trks) {
         trk_flat <- .merge_themes(plot_flat,
-                                  .flatten_theme(trk$aesthetics))
+                                  .normalize_blanks(.flatten_theme(trk$aesthetics)))
         trk$resolved_theme <- .build_resolved_theme(trk_flat)
       }
 
@@ -251,6 +277,14 @@ SeqPlotR6 <- R6::R6Class("SeqPlot",
         trk$scale_y2 <- .merge_scale_with_theme(trk$scale_y2,
                            trk$resolved_theme$axes$y2)
 
+        # Genomic scales without explicit windows inherit from the track.
+        trk$scale_x  <- .resolve_scale_windows(trk$scale_x,  trk$windows)
+        trk$scale_y  <- .resolve_scale_windows(trk$scale_y,
+                                              trk$y_windows %||% trk$windows)
+        trk$scale_x2 <- .resolve_scale_windows(trk$scale_x2, trk$windows)
+        trk$scale_y2 <- .resolve_scale_windows(trk$scale_y2,
+                                              trk$y_windows %||% trk$windows)
+
         # Flag which secondary axes are "active" for draw decisions.
         visible_x2 <- trk$resolved_theme$axes$x2$visible
         visible_y2 <- trk$resolved_theme$axes$y2$visible
@@ -261,6 +295,24 @@ SeqPlotR6 <- R6::R6Class("SeqPlot",
                            !is.null(trk$scale_y2) ||
                            isTRUE(visible_y2)
       }
+
+      # Resolve plot_margin into a per-side defaults list, then let any
+      # user-provided `aesthetics = aes(margins = ...)` override per-side.
+      pm <- self$plot_margin %||% 0.02
+      if (length(pm) == 1L) {
+        pm_default <- list(top = pm, right = pm, bottom = pm, left = pm)
+      } else if (length(pm) == 4L) {
+        # c(bottom, left, top, right) — matches normalize_margin's convention
+        pm_default <- list(top = pm[3], right = pm[4],
+                           bottom = pm[1], left = pm[2])
+      } else {
+        pm_default <- list(top = 0.02, right = 0.02,
+                           bottom = 0.02, left = 0.02)
+      }
+      pm_user <- plot_flat$margins %||% list()
+      pm_final <- utils::modifyList(pm_default, pm_user)
+      plot_flat$margins <- pm_final
+      self$flat_theme$margins <- pm_final
 
       if (!is.null(self$layout_str)) {
         self$layout <- .build_patchwork_layout(
@@ -375,8 +427,9 @@ SeqPlotR6 <- R6::R6Class("SeqPlot",
           p <- win$inner
 
           if (draw_x && !is.null(win$xscale) && !is.null(trk$scale_x)) {
+            xpr <- win$xplot_range %||% win$xscale
             meta <- .compute_scale_breaks(trk$scale_x, win$xscale,
-                                          plot_range = win$xscale)
+                                          plot_range = xpr)
             gp_x <- grid::gpar(
               col   = .resolve_theme(flat, "axis.x.gridline.color", "grey85"),
               lwd   = .resolve_theme(flat, "axis.x.gridline.lwd", 0.5),
@@ -384,7 +437,7 @@ SeqPlotR6 <- R6::R6Class("SeqPlot",
               alpha = .resolve_theme(flat, "axis.x.gridline.alpha", 1)
             )
             for (b in meta$breaks) {
-              xpos <- .axis_map_npc(b, win$xscale, p$x0, p$x1)
+              xpos <- .axis_map_npc(b, xpr, p$x0, p$x1)
               grid::grid.lines(x = grid::unit(c(xpos, xpos), "npc"),
                                y = grid::unit(c(p$y0, p$y1), "npc"),
                                gp = gp_x)
@@ -392,8 +445,9 @@ SeqPlotR6 <- R6::R6Class("SeqPlot",
           }
 
           if (draw_y && !is.null(win$yscale) && !is.null(trk$scale_y)) {
+            ypr <- win$yplot_range %||% win$yscale
             meta <- .compute_scale_breaks(trk$scale_y, win$yscale,
-                                          plot_range = win$yscale)
+                                          plot_range = ypr)
             gp_y <- grid::gpar(
               col   = .resolve_theme(flat, "axis.y.gridline.color", "grey85"),
               lwd   = .resolve_theme(flat, "axis.y.gridline.lwd", 0.5),
@@ -401,7 +455,7 @@ SeqPlotR6 <- R6::R6Class("SeqPlot",
               alpha = .resolve_theme(flat, "axis.y.gridline.alpha", 1)
             )
             for (b in meta$breaks) {
-              ypos <- .axis_map_npc(b, win$yscale, p$y0, p$y1)
+              ypos <- .axis_map_npc(b, ypr, p$y0, p$y1)
               grid::grid.lines(x = grid::unit(c(p$x0, p$x1), "npc"),
                                y = grid::unit(c(ypos, ypos), "npc"),
                                gp = gp_y)
@@ -688,7 +742,82 @@ SeqPlotR6 <- R6::R6Class("SeqPlot",
       self$drawAxes()
       self$drawElements()
       self$drawLegends()
+      if (isTRUE(self$highlight_margins))
+        self$drawMarginHighlights()
       invisible(self)
+    },
+
+    #' @description Overlay translucent coloured rects on every margin band
+    #'   for development. Triggered by `seq_plot(highlight_margins = TRUE)`.
+    #'   Colours:
+    #'   plot margin red, outer track dark blue, inner track light blue,
+    #'   outer window dark green, inner window light green, plotting area
+    #'   pink. All drawn at `alpha = 0.5`.
+    #' @return Invisibly `NULL`.
+    drawMarginHighlights = function() {
+      if (is.null(self$layout)) return(invisible())
+      .rect <- function(x0, x1, y0, y1, fill) {
+        if (!is.finite(x0) || !is.finite(x1) ||
+            !is.finite(y0) || !is.finite(y1)) return(invisible())
+        if (x1 <= x0 || y1 <= y0) return(invisible())
+        grid::grid.rect(
+          x = grid::unit(x0, "npc"),
+          y = grid::unit(y0, "npc"),
+          width  = grid::unit(x1 - x0, "npc"),
+          height = grid::unit(y1 - y0, "npc"),
+          just = c("left", "bottom"),
+          gp = grid::gpar(fill = fill, col = NA, alpha = 0.5)
+        )
+      }
+      .band <- function(outer, inner, fill) {
+        # Draw the annulus between two boxes as four side rects.
+        .rect(outer$x0, outer$x1, inner$y1, outer$y1, fill)  # top
+        .rect(outer$x0, outer$x1, outer$y0, inner$y0, fill)  # bottom
+        .rect(outer$x0, inner$x0, inner$y0, inner$y1, fill)  # left
+        .rect(inner$x1, outer$x1, inner$y0, inner$y1, fill)  # right
+      }
+
+      col_plot_margin    <- "#E41A1C"
+      col_track_outer    <- "#08306B"
+      col_track_inner    <- "#6BAED6"
+      col_window_outer   <- "#00441B"
+      col_window_inner   <- "#74C476"
+      col_plot_area      <- "#F768A1"
+
+      # plot_margin: four canvas bands
+      cmb <- self$layout$canvasMarginBounds
+      if (!is.null(cmb)) {
+        for (s in c("top", "bottom", "left", "right")) {
+          r <- cmb[[s]]; if (is.null(r)) next
+          .rect(r$x0, r$x1, r$y0, r$y1, col_plot_margin)
+        }
+      }
+
+      for (panels in self$layout$panelBounds) {
+        if (length(panels) == 0L) next
+        # Track-level: outer margin = full → outer; inner margin = outer → inner.
+        tf <- panels[[1]]$track_full
+        to <- panels[[1]]$track_outer
+        ti <- panels[[1]]$track_inner
+        if (!is.null(tf) && !is.null(to))
+          .band(tf, to, col_track_outer)
+        if (!is.null(to) && !is.null(ti))
+          .band(to, ti, col_track_inner)
+
+        # Window-level: window_full → window_outer → inner
+        for (p in panels) {
+          wf <- p$full
+          wo <- p$window_outer
+          wi <- p$inner
+          if (!is.null(wf) && !is.null(wo))
+            .band(wf, wo, col_window_outer)
+          if (!is.null(wo) && !is.null(wi))
+            .band(wo, wi, col_window_inner)
+          if (!is.null(wi))
+            .rect(wi$x0, wi$x1, wi$y0, wi$y1, col_plot_area)
+        }
+      }
+      invisible()
     }
   )
 )
@@ -706,6 +835,15 @@ SeqPlotR6 <- R6::R6Class("SeqPlot",
 #'   drawn regardless of element or track settings. Default `TRUE`.
 #' @param legend Convenience alias: `legend = FALSE` is sugar for
 #'   `show_legend = FALSE`. All other values are ignored.
+#' @param windows Optional plot-wide `GRanges`. Tracks that do not set
+#'   their own `windows` (and genomic scales nested in them) inherit
+#'   from this value.
+#' @param plot_margin Numeric. Outermost canvas margin in NPC units
+#'   (default `0.02`). Per-side overrides via
+#'   `aesthetics = aes(margins = list(top = …, …))` still win.
+#' @param highlight_margins Logical. When `TRUE`, overlay translucent
+#'   coloured rects on every margin band — a development aid. Default
+#'   `FALSE`.
 #' @param ... Additional arguments reserved for future use.
 #' @return A `SeqPlotR6` instance (S3 class `"SeqPlot"`).
 #' @examples
@@ -713,9 +851,13 @@ SeqPlotR6 <- R6::R6Class("SeqPlot",
 #' seq_plot(layout = "AB\nCC")
 #' @export
 seq_plot <- function(layout = NULL, aesthetics = aes(), show_legend = TRUE,
-                     legend = NULL, ...) {
+                     legend = NULL, windows = NULL,
+                     plot_margin = 0.02,
+                     highlight_margins = FALSE, ...) {
   SeqPlotR6$new(layout = layout, aesthetics = aesthetics,
-                show_legend = show_legend, legend = legend, ...)
+                show_legend = show_legend, legend = legend,
+                windows = windows, plot_margin = plot_margin,
+                highlight_margins = highlight_margins, ...)
 }
 
 #' Auto-print a SeqPlot

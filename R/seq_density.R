@@ -54,7 +54,8 @@ SeqDensityR6 <- R6::R6Class("SeqDensity",
         pm <- layout_track[[w]]
         if (is.null(pm)) next
 
-        u_d <- pmax(pmin((dens$x - pm$yscale[1]) / diff(pm$yscale), 1), 0)
+        ypr <- pm$yplot_range %||% pm$yscale
+        u_d <- pmax(pmin((dens$x - ypr[1]) / diff(ypr), 1), 0)
         xw  <- pm$inner$x1 - pm$inner$x0
         yw  <- pm$inner$y1 - pm$inner$y0
         x_c <- pm$inner$x0 + u_d * xw

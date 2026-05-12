@@ -67,10 +67,14 @@ SeqLineR6 <- R6::R6Class("SeqLine",
           y_sub <- rep(y_sub, each = 2)[seq_len(max(n2 - 1, 0))]
         }
 
-        u <- pmax(pmin((x_sub - panel_meta$xscale[1]) /
-                         diff(panel_meta$xscale), 1), 0)
-        v <- pmax(pmin((y_sub - panel_meta$yscale[1]) /
-                         diff(panel_meta$yscale), 1), 0)
+        xpr <- panel_meta$xplot_range %||% panel_meta$xscale
+        ypr <- panel_meta$yplot_range %||% panel_meta$yscale
+        oob <- .apply_oob(x_sub, y_sub, xpr, ypr,
+                          mode = panel_meta$x_oob %||% "exclude",
+                          label = "seq_line")
+        x_sub <- oob$x; y_sub <- oob$y
+        u <- (x_sub - xpr[1]) / diff(xpr)
+        v <- (y_sub - ypr[1]) / diff(ypr)
         self$coordCanvas[[w]] <- list(
           x = panel_meta$inner$x0 + u *
             (panel_meta$inner$x1 - panel_meta$inner$x0),

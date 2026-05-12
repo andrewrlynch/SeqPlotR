@@ -39,6 +39,16 @@ patchwork mode.}
 
 \item{\code{show_legend}}{Logical. Global legend switch. When \code{FALSE}, no legend
 output is produced for any track. Default \code{TRUE}.}
+
+\item{\code{windows}}{Optional plot-wide \code{GRanges}. Inherited by any track
+whose \code{windows} is \code{NULL}. Genomic scales without explicit
+\code{windows} also inherit from their enclosing track.}
+
+\item{\code{plot_margin}}{Scalar (or length-4 \code{c(b, l, t, r)}) used as the
+outermost canvas margin. Defaults to 0.02.}
+
+\item{\code{highlight_margins}}{Logical. When \code{TRUE}, draw translucent
+overlays on every margin band — a development aid.}
 }
 \if{html}{\out{</div>}}
 }
@@ -56,6 +66,7 @@ output is produced for any track. Default \code{TRUE}.}
 \item \href{#method-SeqPlot-drawElements}{\code{SeqPlotR6$drawElements()}}
 \item \href{#method-SeqPlot-drawLegends}{\code{SeqPlotR6$drawLegends()}}
 \item \href{#method-SeqPlot-plot}{\code{SeqPlotR6$plot()}}
+\item \href{#method-SeqPlot-drawMarginHighlights}{\code{SeqPlotR6$drawMarginHighlights()}}
 \item \href{#method-SeqPlot-clone}{\code{SeqPlotR6$clone()}}
 }
 }
@@ -71,6 +82,9 @@ Construct a SeqPlotR6.
   tracks = list(),
   show_legend = TRUE,
   legend = NULL,
+  windows = NULL,
+  plot_margin = 0.02,
+  highlight_margins = FALSE,
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -91,6 +105,14 @@ plot. Elements can also be added with \verb{\%+\%}. When supplied with no
 
 \item{\code{legend}}{Convenience argument. \code{legend = FALSE} is sugar for
 \code{show_legend = FALSE}. All other values are ignored.}
+
+\item{\code{windows}}{Optional plot-wide \code{GRanges}. Tracks that omit
+\code{windows} inherit from this value.}
+
+\item{\code{plot_margin}}{Numeric. Outermost canvas margin (default 0.02).}
+
+\item{\code{highlight_margins}}{Logical. Draw translucent margin overlays
+for development (default FALSE).}
 
 \item{\code{...}}{Additional arguments (currently ignored).}
 }
@@ -245,6 +267,24 @@ the grid viewport.
 \if{html}{\out{<div class="r">}}\preformatted{SeqPlotR6$plot()}\if{html}{\out{</div>}}
 }
 
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-SeqPlot-drawMarginHighlights"></a>}}
+\if{latex}{\out{\hypertarget{method-SeqPlot-drawMarginHighlights}{}}}
+\subsection{Method \code{drawMarginHighlights()}}{
+Overlay translucent coloured rects on every margin band
+for development. Triggered by \code{seq_plot(highlight_margins = TRUE)}.
+Colours:
+plot margin red, outer track dark blue, inner track light blue,
+outer window dark green, inner window light green, plotting area
+pink. All drawn at \code{alpha = 0.5}.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{SeqPlotR6$drawMarginHighlights()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+Invisibly \code{NULL}.
+}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-SeqPlot-clone"></a>}}

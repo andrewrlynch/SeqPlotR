@@ -110,10 +110,23 @@ SeqBarR6 <- R6::R6Class("SeqBar",
           df$y1 <- df$y
         }
 
-        u0 <- pmax(pmin((df$x0 - pm$xscale[1]) / diff(pm$xscale), 1), 0)
-        u1 <- pmax(pmin((df$x1 - pm$xscale[1]) / diff(pm$xscale), 1), 0)
-        v0 <- pmax(pmin((df$y0 - pm$yscale[1]) / diff(pm$yscale), 1), 0)
-        v1 <- pmax(pmin((df$y1 - pm$yscale[1]) / diff(pm$yscale), 1), 0)
+        xpr <- pm$xplot_range %||% pm$xscale
+        ypr <- pm$yplot_range %||% pm$yscale
+        mode <- pm$y_oob %||% "exclude"
+        y_in <- (pmax(df$y0, df$y1) >= ypr[1]) & (pmin(df$y0, df$y1) <= ypr[2])
+        n_oob <- sum(!y_in, na.rm = TRUE)
+        if (n_oob > 0L && !isTRUE(getOption("seqplotr.suppress_oob", FALSE))) {
+          verb <- if (mode == "exclude") "excluded" else "plotted"
+          message(n_oob, " out-of-bounds data points ", verb, "! (seq_bar)")
+        }
+        if (mode == "exclude") {
+          df <- df[y_in, , drop = FALSE]
+          if (nrow(df) == 0L) next
+        }
+        u0 <- pmax(pmin((df$x0 - xpr[1]) / diff(xpr), 1), 0)
+        u1 <- pmax(pmin((df$x1 - xpr[1]) / diff(xpr), 1), 0)
+        v0 <- pmax(pmin((df$y0 - ypr[1]) / diff(ypr), 1), 0)
+        v1 <- pmax(pmin((df$y1 - ypr[1]) / diff(ypr), 1), 0)
 
         xw <- pm$inner$x1 - pm$inner$x0
         yw <- pm$inner$y1 - pm$inner$y0

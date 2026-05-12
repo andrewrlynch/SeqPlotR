@@ -150,24 +150,69 @@ seq_scale_fill_discrete <- function(...) {
 #' @param labels Optional character vector of tick labels (same length as
 #'   `breaks`). If `NULL`, breaks are formatted as decimal numbers.
 #' @return A `SeqScaleGenomic` / `SeqPositionScale` object.
+#' @param oob One of `"exclude"` (default — out-of-bounds data rows are
+#'   dropped before the npc transform; a `message()` reports the count)
+#'   or `"perimeter"` (clamped to the axis limits and counted).
+#' @param pretty Optional named list of arguments forwarded to base
+#'   [`pretty()`] (e.g. `list(min.n = 2, high.u.bias = 0)`). Names that
+#'   are not base `pretty()` arguments (such as `bounds` or `f.min`) will
+#'   error from R.
+#' @param unit One of `"Mb"` (megabases), `"Kb"` (kilobases), or `"bp"`
+#'   (base pairs). Controls the divisor applied to raw genomic tick values
+#'   when formatting axis labels (e.g. `unit = "Mb"` divides by 1e6 so
+#'   100,000,000 renders as `100`). When `NULL` (default), the unit is
+#'   inferred from the narrowest window width (>= 1 Mb → Mb; >= 100 bp → Kb;
+#'   otherwise bp).  Setting `unit` also overrides any `scale_factor` or
+#'   `mcols(windows)$scale` derivation.
+#' @param unit.label Controls where the unit string is appended to axis labels.
+#'   Only has an effect when `unit` is also set. One of:
+#'   \describe{
+#'     \item{`"last_in_track"` / `TRUE`}{Append to the last (right-most or
+#'       top-most) label across the entire track. Default.}
+#'     \item{`"last_in_window"`}{Append to the last label within each
+#'       individual window panel.}
+#'     \item{`"all"`}{Append to every tick label.}
+#'     \item{`"title"`}{Do not modify tick labels; instead append
+#'       `" (unit)"` to the axis title (e.g. `"chr1 (Mb)"`).}
+#'     \item{`"none"` / `FALSE`}{Never append the unit string anywhere.}
+#'   }
 #' @export
-seq_scale_genomic <- function(windows, scale_factor = NULL,
+seq_scale_genomic <- function(windows = NULL, scale_factor = NULL,
                               breaks = NULL, minor_breaks = NULL,
                               expand = c(0, 0),
                               cap = c("capped", "full", "exact", "ticks"),
-                              labels = NULL) {
-  stopifnot(inherits(windows, "GRanges"))
+                              labels = NULL,
+                              oob = c("exclude", "perimeter"),
+                              pretty = NULL,
+                              unit = NULL,
+                              unit.label = "last_in_track") {
   cap <- match.arg(cap)
-  if (is.null(scale_factor)) {
-    scale_factor <- if ("scale" %in% names(S4Vectors::mcols(windows)))
-      S4Vectors::mcols(windows)$scale
-    else
-      rep(1e-6, length(windows))
+  oob <- match.arg(oob)
+  if (!is.null(windows) && !inherits(windows, "GRanges"))
+    stop("`windows` must be a GRanges object or NULL.", call. = FALSE)
+  if (!is.null(unit))
+    unit <- match.arg(unit, c("Mb", "Kb", "bp"))
+  if (isTRUE(unit.label))         unit.label <- "last_in_track"
+  if (identical(unit.label, FALSE)) unit.label <- "none"
+  unit.label <- match.arg(unit.label,
+                           c("last_in_track", "last_in_window", "all",
+                             "title", "none"))
+  if (!is.null(windows) && is.null(scale_factor)) {
+    if (!is.null(unit)) {
+      unit_sf      <- switch(unit, Mb = 1e-6, Kb = 1e-3, bp = 1)
+      scale_factor <- rep(unit_sf, length(windows))
+    } else if ("scale" %in% names(S4Vectors::mcols(windows))) {
+      scale_factor <- S4Vectors::mcols(windows)$scale
+    } else {
+      scale_factor <- rep(1e-6, length(windows))
+    }
   }
   structure(
     list(type = "genomic", windows = windows, scale_factor = scale_factor,
          breaks = breaks, minor_breaks = minor_breaks,
-         expand = expand, cap = cap, labels = labels),
+         expand = expand, cap = cap, labels = labels,
+         oob = oob, pretty = pretty,
+         unit = unit, unit.label = unit.label),
     class = c("SeqScaleGenomic", "SeqPositionScale")
   )
 }
@@ -198,12 +243,16 @@ seq_scale_continuous <- function(limits = NULL, n_breaks = 5,
                                  breaks = NULL, minor_breaks = NULL,
                                  expand = c(0.025, 0),
                                  cap = c("capped", "full", "exact", "ticks"),
-                                 labels = NULL) {
+                                 labels = NULL,
+                                 oob = c("exclude", "perimeter"),
+                                 pretty = NULL) {
   cap <- match.arg(cap)
+  oob <- match.arg(oob)
   structure(
     list(type = "continuous", limits = limits, n_breaks = n_breaks,
          breaks = breaks, minor_breaks = minor_breaks,
-         expand = expand, cap = cap, labels = labels),
+         expand = expand, cap = cap, labels = labels,
+         oob = oob, pretty = pretty),
     class = c("SeqScaleContinuous_Pos", "SeqPositionScale")
   )
 }
@@ -224,13 +273,51 @@ seq_scale_continuous <- function(limits = NULL, n_breaks = 5,
 #' @export
 seq_scale_discrete <- function(levels = NULL, labels = NULL,
                                expand = c(0, 0.5),
-                               cap = c("capped", "full", "exact", "ticks")) {
+                               cap = c("capped", "full", "exact", "ticks"),
+                               oob = c("exclude", "perimeter"),
+                               pretty = NULL) {
   cap <- match.arg(cap)
+  oob <- match.arg(oob)
   structure(
     list(type = "discrete", levels = levels, labels = labels,
-         expand = expand, cap = cap),
+         expand = expand, cap = cap, oob = oob, pretty = pretty),
     class = c("SeqScaleDiscrete_Pos", "SeqPositionScale")
   )
+}
+
+# ── Scale-window inheritance ─────────────────────────────────────────────────
+
+#' Resolve a genomic scale's windows from its enclosing track
+#'
+#' When `seq_scale_genomic()` is used inside `seq_track(scale_x = ...)`
+#' without explicit `windows`, the scale should fall back to the track's
+#' windows. This helper mutates the scale in place if needed and
+#' recomputes `scale_factor` from the resolved windows.
+#'
+#' @param scale A `SeqPositionScale` or `NULL`.
+#' @param track_windows A `GRanges` of windows from the enclosing track,
+#'   or `NULL`.
+#' @return The (possibly updated) scale.
+#' @keywords internal
+.resolve_scale_windows <- function(scale, track_windows) {
+  if (is.null(scale)) return(scale)
+  if (!inherits(scale, "SeqScaleGenomic")) return(scale)
+  if (!is.null(scale$windows)) return(scale)
+  if (is.null(track_windows) || !inherits(track_windows, "GRanges"))
+    return(scale)
+  scale$windows <- track_windows
+  if (!is.null(scale$unit)) {
+    # Explicit unit wins over any mcols or default derivation.
+    unit_sf <- switch(scale$unit, Mb = 1e-6, Kb = 1e-3, bp = 1)
+    scale$scale_factor <- rep(unit_sf, length(track_windows))
+  } else if (is.null(scale$scale_factor) ||
+             length(scale$scale_factor) != length(track_windows)) {
+    scale$scale_factor <- if ("scale" %in% names(S4Vectors::mcols(track_windows)))
+      S4Vectors::mcols(track_windows)$scale
+    else
+      rep(1e-6, length(track_windows))
+  }
+  scale
 }
 
 # ── Scale break / expansion helpers ──────────────────────────────────────────
@@ -328,9 +415,12 @@ seq_scale_discrete <- function(levels = NULL, labels = NULL,
   }
 
   # Continuous / genomic path.
+  pretty_args <- scale$pretty %||% list()
+  # User-supplied n in pretty wins; otherwise use n_breaks.
+  base_args <- list(x = if (!is.null(data_range)) data_range else plot_range)
+  if (!"n" %in% names(pretty_args)) base_args$n <- n_breaks
   br <- if (!is.null(scale$breaks)) as.numeric(scale$breaks)
-        else pretty(if (!is.null(data_range)) data_range else plot_range,
-                    n = n_breaks)
+        else do.call(pretty, c(base_args, pretty_args))
 
   # When 0 appears in the breaks and the data range is strictly positive,
   # snap the lower plot_range to 0 so it is not filtered out — 0 is the
@@ -392,7 +482,9 @@ seq_scale_discrete <- function(levels = NULL, labels = NULL,
       minor_breaks = sc$minor_breaks,
       expand       = sc$expand %||% c(0.025, 0),
       cap          = sc$cap %||% "capped",
-      labels       = sc$labels
+      labels       = sc$labels,
+      oob          = sc$oob %||% "exclude",
+      pretty       = sc$pretty
     ))
   }
 
@@ -404,5 +496,7 @@ seq_scale_discrete <- function(levels = NULL, labels = NULL,
   if (is.null(scale$expand)       && !is.null(sc$expand))       scale$expand       <- sc$expand
   if (is.null(scale$cap)          && !is.null(sc$cap))          scale$cap          <- sc$cap
   if (is.null(scale$n_breaks)     && !is.null(sc$n_breaks))     scale$n_breaks     <- sc$n_breaks
+  if (is.null(scale$oob)          && !is.null(sc$oob))          scale$oob          <- sc$oob
+  if (is.null(scale$pretty)       && !is.null(sc$pretty))       scale$pretty       <- sc$pretty
   scale
 }

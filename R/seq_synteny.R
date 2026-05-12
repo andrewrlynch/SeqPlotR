@@ -90,13 +90,13 @@ SeqSyntenyR6 <- R6::R6Class("SeqSynteny",
       valid <- !is.na(ov0_all) & !is.na(ov1_all)
 
       .x_npc <- function(x_gen, pm) {
-        u <- pmax(pmin((x_gen - pm$xscale[1]) /
-                         diff(pm$xscale), 1), 0)
+        xpr <- pm$xplot_range %||% pm$xscale
+        u <- pmax(pmin((x_gen - xpr[1]) / diff(xpr), 1), 0)
         pm$inner$x0 + u * (pm$inner$x1 - pm$inner$x0)
       }
       .y_npc <- function(y_val, pm) {
-        v <- pmax(pmin((y_val - pm$yscale[1]) /
-                         diff(pm$yscale), 1), 0)
+        ypr <- pm$yplot_range %||% pm$yscale
+        v <- pmax(pmin((y_val - ypr[1]) / diff(ypr), 1), 0)
         pm$inner$y0 + v * (pm$inner$y1 - pm$inner$y0)
       }
 

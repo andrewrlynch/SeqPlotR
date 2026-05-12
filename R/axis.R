@@ -333,6 +333,15 @@
               else if (side == "y1")   -1
               else                      1
 
+  # Unit label setup — only active for genomic axes with an explicit unit.
+  unit_str       <- NULL
+  ul_mode        <- "none"
+  if (identical(scale$type, "genomic") && !is.null(scale$unit)) {
+    unit_str <- scale$unit
+    ul_mode  <- scale$unit.label %||% "last_in_track"
+  }
+  n_panels_total <- length(panels)
+
   for (w in seq_along(panels)) {
     if (!per_window && w > 1L) next
     win    <- panels[[w]]
@@ -340,6 +349,10 @@
     scale_lim <- if (is_x) (if (sec) win$xscale2 else win$xscale)
                  else      (if (sec) win$yscale2 else win$yscale)
     if (is.null(scale_lim)) next
+    # Expanded plot range (with scale$expand applied) for tick layout.
+    plot_lim <- if (is_x) (if (sec) win$xplot_range2 else win$xplot_range)
+                else      (if (sec) win$yplot_range2 else win$yplot_range)
+    if (is.null(plot_lim)) plot_lim <- scale_lim
     # When the panel carries a track-level break step (set by layout for
     # multi-window tracks), force all windows to use the same tick interval.
     # Only applies to genomic x axes where no explicit breaks are set.
@@ -357,11 +370,13 @@
         forced <- c(0, forced)
       sc_tmp        <- scale
       sc_tmp$breaks <- forced
-      meta <- .compute_scale_breaks(sc_tmp, scale_lim, plot_range = scale_lim)
+      meta <- .compute_scale_breaks(sc_tmp, scale_lim, plot_range = plot_lim)
     } else {
-      meta <- .compute_scale_breaks(scale, scale_lim, plot_range = scale_lim)
+      meta <- .compute_scale_breaks(scale, scale_lim, plot_range = plot_lim)
     }
     if (length(meta$breaks) == 0L) next
+    is_last_panel_w <- !per_window || (w == n_panels_total)
+    n_breaks_w      <- length(meta$breaks)
 
     # Panel npc endpoints along the axis direction.
     if (is_x) { lo <- p$x0; hi <- p$x1 } else { lo <- p$y0; hi <- p$y1 }
@@ -377,8 +392,8 @@
     # --- Axis line ---
     if (isTRUE(spec$line$visible) && !is.null(meta$axis_range)) {
       ar <- meta$axis_range
-      ar_lo <- .axis_map_npc(ar[1], scale_lim, lo, hi, flip = flip)
-      ar_hi <- .axis_map_npc(ar[2], scale_lim, lo, hi, flip = flip)
+      ar_lo <- .axis_map_npc(ar[1], plot_lim, lo, hi, flip = flip)
+      ar_hi <- .axis_map_npc(ar[2], plot_lim, lo, hi, flip = flip)
       gp_line <- grid::gpar(col = spec$line$col %||% "#1C1B1A",
                             lwd = spec$line$lwd %||% 1,
                             alpha = spec$line$alpha %||% 1)
@@ -444,7 +459,7 @@
                               alpha = spec$ticks$alpha %||% 1)
         for (i in seq_along(meta$breaks)) {
           b   <- meta$breaks[i]
-          pos <- .axis_map_npc(b, scale_lim, lo, hi, flip = flip)
+          pos <- .axis_map_npc(b, plot_lim, lo, hi, flip = flip)
           if (is_x) {
             grid::grid.lines(x = grid::unit(c(pos, pos), "npc"),
                              y = grid::unit(c(anchor,
@@ -470,7 +485,7 @@
                             alpha = spec$ticks$alpha %||% 1)
       for (i in seq_along(meta$breaks)) {
         b   <- meta$breaks[i]
-        pos <- .axis_map_npc(b, scale_lim, lo, hi, flip = flip)
+        pos <- .axis_map_npc(b, plot_lim, lo, hi, flip = flip)
         if (isTRUE(spec$ticks$visible)) {
           if (is_x) {
             grid::grid.lines(x = grid::unit(c(pos, pos), "npc"),
@@ -496,6 +511,15 @@
               if (identical(scale$type, "genomic")) (win$yScaleFactor %||% 1e-6) else 1
             }
             lbl <- .axis_fmt(as.numeric(lbl) * scaleF)
+            if (!is.null(unit_str)) {
+              add_unit <- switch(ul_mode,
+                all            = TRUE,
+                last_in_window = (i == n_breaks_w),
+                last_in_track  = is_last_panel_w && (i == n_breaks_w),
+                FALSE
+              )
+              if (add_unit) lbl <- paste(lbl, unit_str)
+            }
           } else {
             lbl <- as.character(lbl)
           }
@@ -530,7 +554,7 @@
       if (isTRUE(spec$ticks$visible) && length(meta$minor_breaks) > 0L) {
         minor_len <- tick_len * 0.6
         for (mb in meta$minor_breaks) {
-          pos <- .axis_map_npc(mb, scale_lim, lo, hi, flip = flip)
+          pos <- .axis_map_npc(mb, plot_lim, lo, hi, flip = flip)
           if (is_x) {
             grid::grid.lines(x = grid::unit(c(pos, pos), "npc"),
                              y = grid::unit(c(anchor,
@@ -557,10 +581,20 @@
   if (isTRUE(spec$title$visible)) {
     first <- panels[[1]]
     tm    <- first$track_mapping
-    default_text <- if (!is.null(tm) && !is.null(tm[[if (is_x) "x" else "y"]]))
-      paste(deparse(tm[[if (is_x) "x" else "y"]]), collapse = " ")
+    axis_dim <- if (is_x) "x" else "y"
+    # Prefer the first element's mapping over the track's mapping.
+    elem_map <- if (length(track$elements) > 0L)
+      track$elements[[1]]$mapping else NULL
+    elem_expr <- if (!is.null(elem_map)) elem_map[[axis_dim]] else NULL
+    track_expr <- if (!is.null(tm)) tm[[axis_dim]] else NULL
+    default_text <- if (!is.null(elem_expr))
+      paste(deparse(elem_expr), collapse = " ")
+    else if (!is.null(track_expr))
+      paste(deparse(track_expr), collapse = " ")
     else NULL
-    user_title <- spec$title$text
+    # For genomic axes, each window's default title is its seqname.
+    is_genomic <- identical(scale$type, "genomic")
+    user_title <- spec$title$label %||% spec$title$text
     gp_title <- grid::gpar(col = spec$title$col %||% "#1C1B1A",
                            cex = spec$title$size %||% 0.8)
 
@@ -589,8 +623,32 @@
       return(invisible())
     }
 
-    is_per_window <- length(panels) > 1L &&
-                     !is.null(panels[[1]]$.combined_window_label)
+    # Helper: seqname for a panel's window (x or y), or NULL.
+    seqname_for_panel <- function(win, w) {
+      if (!is_genomic) return(NULL)
+      if (is_x) {
+        if (!is.null(win$.combined_window_label))
+          return(win$.combined_window_label)
+        wins <- track$windows
+        if (!is.null(wins) && length(wins) >= w)
+          return(as.character(GenomicRanges::seqnames(wins[w])))
+      } else {
+        if (!is.null(win$seqname)) return(win$seqname)
+        ywins <- track$y_windows %||% track$windows
+        if (!is.null(ywins) && length(ywins) >= w)
+          return(as.character(GenomicRanges::seqnames(ywins[w])))
+      }
+      NULL
+    }
+    # Force per-window mode when the genomic scale has multiple windows.
+    n_genomic_wins <- if (is_genomic) {
+      wins_g <- if (is_x) track$windows
+                else (track$y_windows %||% track$windows)
+      if (!is.null(wins_g)) length(wins_g) else 0L
+    } else 0L
+    is_per_window <- (length(panels) > 1L &&
+                      !is.null(panels[[1]]$.combined_window_label)) ||
+                     (is_genomic && length(panels) > 1L && n_genomic_wins > 1L)
 
     if (is_per_window && is_x) {
       ty <- if (side == "x1")
@@ -600,7 +658,10 @@
       for (w in seq_along(panels)) {
         win    <- panels[[w]]
         title_text <- user_title %||% win$.combined_window_label %||%
-                      default_text
+                      seqname_for_panel(win, w) %||% default_text
+        if (!is.null(unit_str) && identical(ul_mode, "title") &&
+            !is.null(title_text) && nzchar(title_text))
+          title_text <- paste0(title_text, " (", unit_str, ")")
         if (is.null(title_text) || !nzchar(title_text)) next
         tx <- (win$inner$x0 + win$inner$x1) / 2
         grid::grid.text(label = title_text,
@@ -617,7 +678,10 @@
       for (w in seq_along(panels)) {
         win <- panels[[w]]
         title_text <- user_title %||% win$.combined_window_label %||%
-                      default_text
+                      seqname_for_panel(win, w) %||% default_text
+        if (!is.null(unit_str) && identical(ul_mode, "title") &&
+            !is.null(title_text) && nzchar(title_text))
+          title_text <- paste0(title_text, " (", unit_str, ")")
         if (is.null(title_text) || !nzchar(title_text)) next
         ty <- (win$inner$y0 + win$inner$y1) / 2
         grid::grid.text(label = title_text,
@@ -627,7 +691,13 @@
                         gp = gp_title)
       }
     } else {
-      title_text <- user_title %||% default_text
+      # Single-title branch — still pick up the genomic seqname when only
+      # one window is shown on a genomic axis.
+      one_seq <- if (is_genomic) seqname_for_panel(first, 1L) else NULL
+      title_text <- user_title %||% one_seq %||% default_text
+      if (!is.null(unit_str) && identical(ul_mode, "title") &&
+          !is.null(title_text) && nzchar(title_text))
+        title_text <- paste0(title_text, " (", unit_str, ")")
       if (!is.null(title_text) && nzchar(title_text)) {
         if (is_x) {
           tx <- (first$track_outer$x0 + first$track_outer$x1) / 2

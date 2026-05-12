@@ -248,8 +248,9 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
           ntiers_minus <- max(tiers)
         }
 
-        u0 <- (gene_start - pm$xscale[1]) / diff(pm$xscale)
-        u1 <- (gene_end   - pm$xscale[1]) / diff(pm$xscale)
+        xpr <- pm$xplot_range %||% pm$xscale
+        u0 <- (gene_start - xpr[1]) / diff(xpr)
+        u1 <- (gene_end   - xpr[1]) / diff(xpr)
         x0c <- pm$inner$x0 + u0 * (pm$inner$x1 - pm$inner$x0)
         x1c <- pm$inner$x0 + u1 * (pm$inner$x1 - pm$inner$x0)
 
@@ -291,7 +292,7 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
         }
 
         # Convert TSS genomic positions to NPC.
-        tss_npc <- (tss_genomic - pm$xscale[1]) / diff(pm$xscale) *
+        tss_npc <- (tss_genomic - xpr[1]) / diff(xpr) *
                    (pm$inner$x1 - pm$inner$x0) + pm$inner$x0
 
         for (i in seq_along(gids)) {
@@ -408,8 +409,8 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
           end_sub   <- end_sub[draw_mask]
           height_scale <- height_scale[draw_mask]
 
-          ux0 <- (start_sub - pm$xscale[1]) / diff(pm$xscale)
-          ux1 <- (end_sub   - pm$xscale[1]) / diff(pm$xscale)
+          ux0 <- (start_sub - xpr[1]) / diff(xpr)
+          ux1 <- (end_sub   - xpr[1]) / diff(xpr)
           ex0 <- pm$inner$x0 + ux0 * (pm$inner$x1 - pm$inner$x0)
           ex1 <- pm$inner$x0 + ux1 * (pm$inner$x1 - pm$inner$x0)
           half_h <- exon_h / 2 * height_scale

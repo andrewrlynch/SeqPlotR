@@ -147,6 +147,57 @@
   out
 }
 
+#' Translate bare NA values on structural axis keys to `visible = FALSE`
+#'
+#' Mirrors ggplot's `element_blank()`: when a user writes
+#' `aes(axis.x.line = NA)` the intent is to hide that piece. After
+#' flattening, scan the theme for the known structural sub-keys
+#' (`axis.<side>.line`, `.title`, `.ticks`, `.labels`, `.text`,
+#' `.gridline`) whose value is bare `NA`, and rewrite as
+#' `<key>.visible = FALSE` (dropping the raw NA leaf so it does not
+#' confuse downstream resolvers). Also recognises a bare string on
+#' `axis.<side>.title` as a shorthand for `axis.<side>.title.label`.
+#'
+#' @param flat A flat theme map (from `.flatten_theme()`).
+#' @return The transformed flat theme.
+#' @keywords internal
+.normalize_blanks <- function(flat) {
+  if (length(flat) == 0L) return(flat)
+  structural <- c("line", "title", "ticks", "labels", "text", "gridline")
+  sides      <- c("x", "y", "x1", "x2", "y1", "y2")
+  # Pre-compute candidate parent keys.
+  parents <- as.vector(outer(
+    paste0("axis.", sides),
+    paste0(".", structural),
+    paste0
+  ))
+  also_parents <- c("axis.line", "axis.title", "axis.ticks",
+                    "axis.labels", "axis.text", "axis.gridline")
+  all_parents <- c(parents, also_parents)
+
+  drop <- character(0)
+  for (k in intersect(all_parents, names(flat))) {
+    v <- flat[[k]]
+    if (length(v) == 1L && is.logical(v) && is.na(v)) {
+      flat[[paste0(k, ".visible")]] <- FALSE
+      drop <- c(drop, k)
+      next
+    }
+    if (length(v) == 1L && is.atomic(v) && is.na(v)) {
+      flat[[paste0(k, ".visible")]] <- FALSE
+      drop <- c(drop, k)
+      next
+    }
+    # Bare string on a `*.title` parent → label shorthand.
+    if (endsWith(k, ".title") && is.character(v) && length(v) == 1L) {
+      flat[[paste0(k, ".label")]] <- v
+      drop <- c(drop, k)
+    }
+  }
+  if (length(drop) > 0L) flat[drop] <- NULL
+  flat
+}
+
 # ── Default theme ────────────────────────────────────────────────────────────
 
 #' The built-in default theme for SeqPlotR
@@ -169,7 +220,8 @@
     # chain resolves to it first, then falls back to `window_gaps`.
     track_gaps  = 0.01,
     window_gaps = 0.01,   # deprecated alias for window.gap.width
-    margins     = list(top = 0, right = 0, bottom = 0, left = 0),
+    # `margins` is intentionally omitted here so layoutGrid() can detect
+    # the absence of user-set margins and fall back to `plot_margin`.
 
     # Axis defaults — declared at the most general level and inherited by
     # axis.x / axis.y / axis.x1 / axis.x2 / axis.y1 / axis.y2.
@@ -195,6 +247,8 @@
     "axis.scale.breaks"        = NULL,
     "axis.scale.minor_breaks"  = NULL,
     "axis.scale.limits"        = NULL,
+    "axis.scale.oob"           = "exclude",
+    "axis.scale.pretty"        = NULL,
 
     # Side-specific defaults (override the more general axis.* keys).
     "axis.x1.position"         = "bottom",
@@ -297,6 +351,7 @@
       size     = .get("title.size", 0.8),
       col      = .get("title.col",  .get("line.col", "#1C1B1A")),
       text     = .get("title.text", NULL),
+      label    = .get("title.label", NULL),
       visible  = .get("title.visible", TRUE),
       position = .get("title.position", "axis"),
       hjust    = .get("title.hjust",    NULL),
@@ -309,7 +364,9 @@
       breaks        = .get("scale.breaks", NULL),
       minor_breaks  = .get("scale.minor_breaks", NULL),
       limits        = .get("scale.limits", NULL),
-      labels        = .get("scale.labels", NULL)
+      labels        = .get("scale.labels", NULL),
+      oob           = .get("scale.oob", "exclude"),
+      pretty        = .get("scale.pretty", NULL)
     )
   )
 }

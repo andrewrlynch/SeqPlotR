@@ -55,16 +55,20 @@ SeqTextR6 <- R6::R6Class("SeqText",
         panel_meta <- layout_track[[w]]
         idx <- qh[mask]
 
-        u <- pmax(pmin((x_vals[idx] - panel_meta$xscale[1]) /
-                         diff(panel_meta$xscale), 1), 0)
-        v <- pmax(pmin((y_vals[idx] - panel_meta$yscale[1]) /
-                         diff(panel_meta$yscale), 1), 0)
+        xpr <- panel_meta$xplot_range %||% panel_meta$xscale
+        ypr <- panel_meta$yplot_range %||% panel_meta$yscale
+        oob <- .apply_oob(x_vals[idx], y_vals[idx], xpr, ypr,
+                          mode = panel_meta$x_oob %||% "exclude",
+                          label = "seq_text")
+        idx_k <- idx[oob$keep]
+        u <- (oob$x - xpr[1]) / diff(xpr)
+        v <- (oob$y - ypr[1]) / diff(ypr)
         self$coordCanvas[[w]] <- list(
           x     = panel_meta$inner$x0 + u *
                     (panel_meta$inner$x1 - panel_meta$inner$x0),
           y     = panel_meta$inner$y0 + v *
                     (panel_meta$inner$y1 - panel_meta$inner$y0),
-          label = lbl_vals[idx]
+          label = lbl_vals[idx_k]
         )
       }
       invisible()

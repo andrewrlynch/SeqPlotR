@@ -213,8 +213,9 @@ SeqIdeogramR6 <- R6::R6Class("SeqIdeogram",
         bands <- eff_data[idx]
         stain <- stain_all[idx]
 
-        u0 <- (BiocGenerics::start(bands) - pm$xscale[1]) / diff(pm$xscale)
-        u1 <- (BiocGenerics::end(bands)   - pm$xscale[1]) / diff(pm$xscale)
+        xpr <- pm$xplot_range %||% pm$xscale
+        u0 <- (BiocGenerics::start(bands) - xpr[1]) / diff(xpr)
+        u1 <- (BiocGenerics::end(bands)   - xpr[1]) / diff(xpr)
         u0 <- pmax(pmin(u0, 1), 0); u1 <- pmax(pmin(u1, 1), 0)
 
         x0c <- pm$inner$x0 + u0 * (pm$inner$x1 - pm$inner$x0)

@@ -11,7 +11,9 @@ seq_scale_continuous(
   minor_breaks = NULL,
   expand = c(0.025, 0),
   cap = c("capped", "full", "exact", "ticks"),
-  labels = NULL
+  labels = NULL,
+  oob = c("exclude", "perimeter"),
+  pretty = NULL
 )
 }
 \arguments{
