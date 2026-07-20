@@ -22,8 +22,24 @@ Internal R6 generator backing \code{\link[=seq_gene]{seq_gene()}}. Inherits from
 \item{\code{exon_height}}{Proportion of per-tier height allocated to the
 exon box.}
 
-\item{\code{label_pad}}{Minimum padding (in bp) around each gene's extent to
-keep labels from overlapping neighbouring genes.}
+\item{\code{label_pad}}{Reserved. Padding (in bp) once used to keep flush
+labels from overlapping neighbouring genes. Exposed for
+forward-compatibility; it does \strong{not} currently affect tier packing.}
+
+\item{\code{label_position}}{Character. One of \code{"flush"}, \code{"above"}, \code{"below"}.
+Controls where the gene label is drawn. Default \code{"flush"}.}
+
+\item{\code{label_row_frac}}{Numeric in \verb{[0, 1)}. Fraction of each tier row
+reserved for the label when \code{label_position} is \code{"above"}/\code{"below"};
+the exon/gene glyph height is shrunk accordingly. Default \code{0.35}.}
+
+\item{\code{pack_direction}}{Character. One of \code{"bottom_to_top"},
+\code{"top_to_bottom"}. Physical edge tier 1 is drawn from. Default
+\code{"bottom_to_top"}.}
+
+\item{\code{expanded}}{Logical. When \code{TRUE}, every gene gets its own tier
+(one gene per row) regardless of genomic overlap, consistently across
+all windows in the track. Default \code{FALSE}.}
 
 \item{\code{label_cex}}{Expansion factor for gene label text.}
 
@@ -87,6 +103,11 @@ Construct a SeqGeneR6.
   tss_position = NULL,
   separate_strands = FALSE,
   style_type = c("exon", "gene", "point"),
+  label_position = c("flush", "above", "below"),
+  label_row_frac = 0.35,
+  pack_direction = c("bottom_to_top", "top_to_bottom"),
+  expanded = FALSE,
+  label_pad = 50000,
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -118,6 +139,21 @@ sub-bands. Default \code{FALSE}.}
 \item{\code{style_type}}{Character. One of \code{"exon"} (default), \code{"gene"}, or
 \code{"point"}. Controls per-gene rendering: full backbone + exon boxes,
 single chevron polygon, or a single TSS point.}
+
+\item{\code{label_position}}{Character. One of \code{"flush"} (default), \code{"above"},
+\code{"below"}. Where the gene label is drawn.}
+
+\item{\code{label_row_frac}}{Numeric in \verb{[0, 1)}. Fraction of each tier row
+reserved for \code{"above"}/\code{"below"} labels. Default \code{0.35}.}
+
+\item{\code{pack_direction}}{Character. One of \code{"bottom_to_top"} (default) or
+\code{"top_to_bottom"}. Physical edge tier 1 is drawn from.}
+
+\item{\code{expanded}}{Logical. When \code{TRUE}, one gene per tier regardless of
+overlap, consistent across all windows. Default \code{FALSE}.}
+
+\item{\code{label_pad}}{Numeric. Reserved; does not currently affect packing.
+Default \code{50000}.}
 
 \item{\code{...}}{Unused.}
 }

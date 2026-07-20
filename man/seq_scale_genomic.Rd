@@ -13,7 +13,9 @@ seq_scale_genomic(
   cap = c("capped", "full", "exact", "ticks"),
   labels = NULL,
   oob = c("exclude", "perimeter"),
-  pretty = NULL
+  pretty = NULL,
+  unit = NULL,
+  unit.label = "last_in_track"
 )
 }
 \arguments{
@@ -48,6 +50,27 @@ or \code{"perimeter"} (clamped to the axis limits and counted).}
 \code{\link[=pretty]{pretty()}} (e.g. \code{list(min.n = 2, high.u.bias = 0)}). Names that
 are not base \code{pretty()} arguments (such as \code{bounds} or \code{f.min}) will
 error from R.}
+
+\item{unit}{One of \code{"Mb"} (megabases), \code{"Kb"} (kilobases), or \code{"bp"}
+(base pairs). Controls the divisor applied to raw genomic tick values
+when formatting axis labels (e.g. \code{unit = "Mb"} divides by 1e6 so
+100,000,000 renders as \code{100}). When \code{NULL} (default), the unit is
+inferred from the narrowest window width (>= 1 Mb → Mb; >= 100 bp → Kb;
+otherwise bp).  Setting \code{unit} also overrides any \code{scale_factor} or
+\code{mcols(windows)$scale} derivation.}
+
+\item{unit.label}{Controls where the unit string is appended to axis labels.
+Only has an effect when \code{unit} is also set. One of:
+\describe{
+\item{\code{"last_in_track"} / \code{TRUE}}{Append to the last (right-most or
+top-most) label across the entire track. Default.}
+\item{\code{"last_in_window"}}{Append to the last label within each
+individual window panel.}
+\item{\code{"all"}}{Append to every tick label.}
+\item{\code{"title"}}{Do not modify tick labels; instead append
+\code{" (unit)"} to the axis title (e.g. \code{"chr1 (Mb)"}).}
+\item{\code{"none"} / \code{FALSE}}{Never append the unit string anywhere.}
+}}
 }
 \value{
 A \code{SeqScaleGenomic} / \code{SeqPositionScale} object.

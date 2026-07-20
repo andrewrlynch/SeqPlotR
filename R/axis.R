@@ -288,6 +288,50 @@
   panels
 }
 
+# ── Tick / label direction ───────────────────────────────────────────────────
+
+#' Sign of the tick/label offset for an axis
+#'
+#' Direction is derived from the axis's resolved *position* (never its
+#' `x1`/`x2`/`y1`/`y2` identifier) plus an explicit `"out"`/`"in"` mode.
+#' `"out"` (default) points ticks and labels away from the panel; `"in"`
+#' flips them toward the panel. A negative sign moves toward smaller npc
+#' (down for x, left for y); positive moves toward larger npc.
+#'
+#' @param axis_pos One of `"bottom"`, `"top"`, `"left"`, `"right"`.
+#' @param dir_mode `"out"` (default) or `"in"`.
+#' @return `-1` or `1`.
+#' @keywords internal
+.axis_tick_dir <- function(axis_pos, dir_mode = "out") {
+  base <- switch(axis_pos, bottom = -1, top = 1, left = -1, right = 1, -1)
+  if (identical(dir_mode, "in")) -base else base
+}
+
+#' Text justification that tracks the tick/label direction
+#'
+#' Returns the anchor justification so a label sits on the outward (or,
+#' when `dir_mode == "in"`, inward) side of the axis line. For x axes the
+#' vertical component (`v`) carries the direction and the horizontal
+#' component is `"center"`; for y axes the horizontal component (`h`)
+#' carries it and the vertical component is `"center"`.
+#'
+#' @param axis_pos One of `"bottom"`, `"top"`, `"left"`, `"right"`.
+#' @param dir_mode `"out"` (default) or `"in"`.
+#' @return A list with `h` and `v` justification strings.
+#' @keywords internal
+.axis_label_just <- function(axis_pos, dir_mode = "out") {
+  outward <- !identical(dir_mode, "in")
+  if (axis_pos %in% c("bottom", "top")) {
+    # Outward-below (bottom) anchors the label by its top edge.
+    v <- if ((axis_pos == "bottom") == outward) "top" else "bottom"
+    list(h = "center", v = v)
+  } else {
+    # Outward-left (left) anchors the label by its right edge.
+    h <- if ((axis_pos == "left") == outward) "right" else "left"
+    list(h = h, v = "center")
+  }
+}
+
 # ── One-axis draw ────────────────────────────────────────────────────────────
 
 #' Draw a single axis (line, ticks, minor ticks, labels, title)
@@ -328,10 +372,15 @@
                 (length(panels) > 1L &&
                  !is.null(panels[[1]]$.combined_window_label))
 
-  tick_dir <- if (side == "x1")        -1
-              else if (side == "x2")    1
-              else if (side == "y1")   -1
-              else                      1
+  # Direction is derived from the axis's resolved *position*, not its
+  # identifier, so overriding e.g. axis.x1.position = "top" correctly moves
+  # ticks/labels with the line. axis.<side>.ticks.direction ("out"/"in")
+  # then flips the sense toward or away from the panel.
+  axis_pos <- spec$position %||%
+    switch(side, x1 = "bottom", x2 = "top", y1 = "left", y2 = "right")
+  dir_mode <- spec$ticks$direction %||% "out"
+  tick_dir <- .axis_tick_dir(axis_pos, dir_mode)
+  label_just <- .axis_label_just(axis_pos, dir_mode)
 
   # Unit label setup — only active for genomic axes with an explicit unit.
   unit_str       <- NULL
@@ -527,22 +576,20 @@
           gp_text <- grid::gpar(col = spec$text$col %||% "#1C1B1A",
                                 cex = spec$text$size %||% 0.6)
           if (is_x) {
-            just_v <- if (side == "x1") "top" else "bottom"
             grid::grid.text(
               label = lbl,
               x = grid::unit(pos, "npc"),
               y = grid::unit(anchor + tick_dir * offset, "npc"),
-              just = c("center", just_v),
+              just = c(label_just$h, label_just$v),
               rot  = spec$text$angle %||% 0,
               gp   = gp_text
             )
           } else {
-            just_h <- if (side == "y1") "right" else "left"
             grid::grid.text(
               label = lbl,
               x = grid::unit(anchor + tick_dir * offset, "npc"),
               y = grid::unit(pos, "npc"),
-              just = c(just_h, "center"),
+              just = c(label_just$h, label_just$v),
               rot  = spec$text$angle %||% 0,
               gp   = gp_text
             )

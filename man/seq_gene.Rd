@@ -13,6 +13,11 @@ seq_gene(
   tss_position = NULL,
   separate_strands = FALSE,
   style_type = c("exon", "gene", "point"),
+  label_position = c("flush", "above", "below"),
+  label_row_frac = 0.35,
+  pack_direction = c("bottom_to_top", "top_to_bottom"),
+  expanded = FALSE,
+  label_pad = 50000,
   ...
 )
 }
@@ -50,6 +55,29 @@ only one strand is present. Default \code{FALSE}.}
 backbone with exon/UTR boxes; \code{"gene"} draws a single chevron-shaped
 polygon spanning the gene extent (no exon detail); \code{"point"} draws a
 single filled circle at the TSS. Labels are drawn in all three modes.}
+
+\item{label_position}{Character. One of \code{"flush"} (default), \code{"above"}, or
+\code{"below"}. \code{"flush"} places the label inline against the gene's 5'/3' end
+(current behaviour); \code{"above"}/\code{"below"} centre the label horizontally
+over the gene body and offset it vertically within the gene's tier row.}
+
+\item{label_row_frac}{Numeric in \verb{[0, 1)}. Fraction of each tier row
+reserved for the label text when \code{label_position} is \code{"above"}/\code{"below"};
+the glyph height shrinks accordingly so labels do not collide with the
+next tier. Default \code{0.35}. Ignored for \code{"flush"}.}
+
+\item{pack_direction}{Character. One of \code{"bottom_to_top"} (default) or
+\code{"top_to_bottom"}. \code{"bottom_to_top"} draws tier 1 at the track bottom and
+stacks upward; \code{"top_to_bottom"} draws tier 1 at the track top and stacks
+downward. Tier \emph{numbers} keep meaning packing order in both cases.}
+
+\item{expanded}{Logical. When \code{TRUE}, the greedy overlap packing is skipped
+and every gene is given its own tier (one gene per row), ordered by
+genomic start (ties broken by label). Tier assignment is consistent
+across all windows in the track. Default \code{FALSE}.}
+
+\item{label_pad}{Numeric. Reserved for forward-compatibility; does not
+currently affect tier packing. Default \code{50000}.}
 
 \item{...}{Additional arguments reserved for future use.}
 }

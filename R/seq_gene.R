@@ -33,9 +33,29 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
     #' @field exon_height Proportion of per-tier height allocated to the
     #'   exon box.
     exon_height   = 0.8,
-    #' @field label_pad Minimum padding (in bp) around each gene's extent to
-    #'   keep labels from overlapping neighbouring genes.
+    #' @field label_pad Reserved. Padding (in bp) once used to keep flush
+    #'   labels from overlapping neighbouring genes. Exposed for
+    #'   forward-compatibility; it does **not** currently affect tier packing.
     label_pad     = 50000,
+
+    #' @field label_position Character. One of `"flush"`, `"above"`, `"below"`.
+    #'   Controls where the gene label is drawn. Default `"flush"`.
+    label_position = "flush",
+
+    #' @field label_row_frac Numeric in `[0, 1)`. Fraction of each tier row
+    #'   reserved for the label when `label_position` is `"above"`/`"below"`;
+    #'   the exon/gene glyph height is shrunk accordingly. Default `0.35`.
+    label_row_frac = 0.35,
+
+    #' @field pack_direction Character. One of `"bottom_to_top"`,
+    #'   `"top_to_bottom"`. Physical edge tier 1 is drawn from. Default
+    #'   `"bottom_to_top"`.
+    pack_direction = "bottom_to_top",
+
+    #' @field expanded Logical. When `TRUE`, every gene gets its own tier
+    #'   (one gene per row) regardless of genomic overlap, consistently across
+    #'   all windows in the track. Default `FALSE`.
+    expanded = FALSE,
     #' @field label_cex Expansion factor for gene label text.
     label_cex     = 0.6,
     #' @field label_offset Horizontal offset (in npc units) applied when
@@ -87,6 +107,16 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
     #' @param style_type Character. One of `"exon"` (default), `"gene"`, or
     #'   `"point"`. Controls per-gene rendering: full backbone + exon boxes,
     #'   single chevron polygon, or a single TSS point.
+    #' @param label_position Character. One of `"flush"` (default), `"above"`,
+    #'   `"below"`. Where the gene label is drawn.
+    #' @param label_row_frac Numeric in `[0, 1)`. Fraction of each tier row
+    #'   reserved for `"above"`/`"below"` labels. Default `0.35`.
+    #' @param pack_direction Character. One of `"bottom_to_top"` (default) or
+    #'   `"top_to_bottom"`. Physical edge tier 1 is drawn from.
+    #' @param expanded Logical. When `TRUE`, one gene per tier regardless of
+    #'   overlap, consistent across all windows. Default `FALSE`.
+    #' @param label_pad Numeric. Reserved; does not currently affect packing.
+    #'   Default `50000`.
     #' @param ... Unused.
     initialize = function(data = NULL, mapping = NULL, aesthetics = aes(),
                           backbone_type    = "arrow",
@@ -94,15 +124,27 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
                           tss_position     = NULL,
                           separate_strands = FALSE,
                           style_type       = c("exon", "gene", "point"),
+                          label_position   = c("flush", "above", "below"),
+                          label_row_frac   = 0.35,
+                          pack_direction   = c("bottom_to_top", "top_to_bottom"),
+                          expanded         = FALSE,
+                          label_pad        = 50000,
                           ...) {
       super$initialize(data, mapping, aesthetics)
-      backbone_type <- match.arg(backbone_type, c("arrow", "solid", "dashed"))
-      style_type    <- match.arg(style_type)
-      self$backbone_type   <- backbone_type
-      self$show_start      <- isTRUE(show_start)
-      self$tss_position    <- tss_position
+      backbone_type  <- match.arg(backbone_type, c("arrow", "solid", "dashed"))
+      style_type     <- match.arg(style_type)
+      label_position <- match.arg(label_position)
+      pack_direction <- match.arg(pack_direction)
+      self$backbone_type    <- backbone_type
+      self$show_start       <- isTRUE(show_start)
+      self$tss_position     <- tss_position
       self$separate_strands <- isTRUE(separate_strands)
-      self$style_type      <- style_type
+      self$style_type       <- style_type
+      self$label_position   <- label_position
+      self$label_row_frac   <- label_row_frac
+      self$pack_direction   <- pack_direction
+      self$expanded         <- isTRUE(expanded)
+      self$label_pad        <- label_pad
     },
 
     #' @description Resolve mappings, stack genes into non-overlapping tiers,
@@ -144,6 +186,76 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
       all_rows <- list()
       nWin    <- length(layout_track)
 
+      # ── Track-level packing setup ───────────────────────────────────────
+      # Strand separation is decided once for the whole track (not per window)
+      # so that band geometry and row heights are consistent across windows.
+      use_sep_strands <- isTRUE(self$separate_strands) &&
+        length(unique(strand_vals[strand_vals %in% c("+", "-")])) > 1L
+
+      # Global gene table — one entry per unique gene id in the whole track.
+      # Used for `expanded` row assignment (which must be identical in every
+      # window) and cheap to build regardless.
+      all_gids   <- unique(group_vals)
+      g_all_start <- BiocGenerics::start(eff_data)
+      g_all_end   <- BiocGenerics::end(eff_data)
+      g_start  <- integer(length(all_gids))
+      g_end    <- integer(length(all_gids))
+      g_strand <- character(length(all_gids))
+      g_label  <- character(length(all_gids))
+      for (i in seq_along(all_gids)) {
+        m <- group_vals == all_gids[i]
+        g_start[i]  <- min(g_all_start[m])
+        g_end[i]    <- max(g_all_end[m])
+        g_strand[i] <- strand_vals[m][1]
+        g_label[i]  <- label_vals[m][1]
+      }
+
+      # `expanded`: assign every gene its own tier, ordered by genomic start
+      # (ties broken alphabetically by label). Under separate_strands each
+      # strand band is ranked independently.
+      global_tier      <- NULL
+      exp_ntiers       <- 1L
+      exp_ntiers_plus  <- 1L
+      exp_ntiers_minus <- 1L
+      if (isTRUE(self$expanded)) {
+        global_tier <- setNames(integer(length(all_gids)), all_gids)
+        if (use_sep_strands) {
+          for (st in c("+", "-")) {
+            sel <- which(g_strand == st)
+            if (!length(sel)) next
+            ordv <- sel[order(g_start[sel], g_label[sel])]
+            global_tier[ordv] <- seq_along(ordv)
+          }
+          exp_ntiers_plus  <- max(1L, sum(g_strand == "+"))
+          exp_ntiers_minus <- max(1L, sum(g_strand == "-"))
+        } else {
+          ordv <- order(g_start, g_label)
+          global_tier[ordv] <- seq_along(ordv)
+          exp_ntiers <- max(1L, length(all_gids))
+        }
+      }
+
+      # Greedy interval-scheduling tier assignment for a group of genes.
+      # `idx` indexes into p0/p1; returns tiers aligned with `idx`.
+      .pack_greedy <- function(idx, p0, p1) {
+        out       <- integer(length(idx))
+        ends_last <- numeric(0)
+        for (k in order(p0[idx])) {
+          s <- p0[idx[k]]; e <- p1[idx[k]]
+          w2 <- which(ends_last < s)
+          if (length(w2) == 0) {
+            out[k]    <- length(ends_last) + 1L
+            ends_last <- c(ends_last, e)
+          } else {
+            out[k]           <- w2[1]
+            ends_last[w2[1]] <- e
+          }
+        }
+        out
+      }
+
+      # ── Pass 1: per-window tier assignment (no canvas geometry yet) ──────
+      win_ctx <- vector("list", nWin)
       for (w in seq_len(nWin)) {
         pm  <- layout_track[[w]]
         win <- track_windows[w]
@@ -152,100 +264,50 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
         if (length(hits) == 0) next
         keep <- unique(S4Vectors::queryHits(hits))
 
-        exons_start <- BiocGenerics::start(eff_data)[keep]
-        exons_end   <- BiocGenerics::end(eff_data)[keep]
+        exons_start <- g_all_start[keep]
+        exons_end   <- g_all_end[keep]
         gid_all     <- group_vals[keep]
-        strand_all  <- strand_vals[keep]
         label_all   <- label_vals[keep]
         type_all    <- type_vals[keep]
-        color_all   <- color_vals[keep]
 
         gids <- unique(gid_all)
         if (length(gids) == 0) next
 
-        gene_start <- integer(length(gids))
-        gene_end   <- integer(length(gids))
-        strand_g   <- character(length(gids))
-        label_g    <- character(length(gids))
-        color_g    <- character(length(gids))
-        for (i in seq_along(gids)) {
-          m <- gid_all == gids[i]
-          gene_start[i] <- min(exons_start[m])
-          gene_end[i]   <- max(exons_end[m])
-          strand_g[i]   <- strand_all[m][1]
-          label_g[i]    <- label_all[m][1]
-          color_g[i]    <- color_all[m][1]
-        }
+        gi_global  <- match(gids, all_gids)
+        gene_start <- g_start[gi_global]
+        gene_end   <- g_end[gi_global]
+        strand_g   <- g_strand[gi_global]
+        label_g    <- g_label[gi_global]
+        color_g    <- vapply(gids, function(gg) color_vals[group_vals == gg][1],
+                             character(1))
 
-        # Pack tiers by raw genomic extent — label space is not part of
-        # the overlap test (labels can extend outside the gene body without
-        # forcing a new tier).
+        # Pack tiers by raw genomic extent — label space is not part of the
+        # overlap test (labels can extend outside the gene body).
         p0 <- gene_start
         p1 <- gene_end
 
-        # Determine whether strand separation is active for this window.
-        use_sep_strands <- isTRUE(self$separate_strands) &&
-          length(unique(strand_all[strand_all %in% c("+", "-")])) > 1L
-
-        track_h <- pm$inner$y1 - pm$inner$y0
-
-        if (use_sep_strands) {
-          # Plus-strand genes occupy the top half, minus-strand the bottom half.
-          plus_y0  <- pm$inner$y0 + track_h / 2
-          plus_y1  <- pm$inner$y1
-          minus_y0 <- pm$inner$y0
-          minus_y1 <- pm$inner$y0 + track_h / 2
-        } else {
-          plus_y0  <- pm$inner$y0
-          plus_y1  <- pm$inner$y1
-          minus_y0 <- pm$inner$y0
-          minus_y1 <- pm$inner$y1
-        }
-
-        # Tier stacking — separate per band when use_sep_strands.
         tiers <- integer(length(gids))
-        if (use_sep_strands) {
-          plus_gids  <- gids[strand_g == "+"]
-          minus_gids <- gids[strand_g == "-"]
-
-          for (band_gids in list(plus_gids, minus_gids)) {
+        if (isTRUE(self$expanded)) {
+          tiers        <- as.integer(global_tier[gids])
+          ntiers_plus  <- exp_ntiers_plus
+          ntiers_minus <- exp_ntiers_minus
+          ntiers_flat  <- exp_ntiers
+        } else if (use_sep_strands) {
+          for (band_gids in list(gids[strand_g == "+"], gids[strand_g == "-"])) {
             if (length(band_gids) == 0) next
-            idx       <- match(band_gids, gids)
-            ends_last <- numeric(0)
-            for (i in order(p0[idx])) {
-              gi <- idx[i]
-              s <- p0[gi]; e <- p1[gi]
-              w2 <- which(ends_last < s)
-              if (length(w2) == 0) {
-                tiers[gi]  <- length(ends_last) + 1
-                ends_last  <- c(ends_last, e)
-              } else {
-                tiers[gi]        <- w2[1]
-                ends_last[w2[1]] <- e
-              }
-            }
+            idx <- match(band_gids, gids)
+            tiers[idx] <- .pack_greedy(idx, p0, p1)
           }
-          ntiers_plus  <- if (length(plus_gids))
-            max(tiers[match(plus_gids,  gids)]) else 1L
-          ntiers_minus <- if (length(minus_gids))
-            max(tiers[match(minus_gids, gids)]) else 1L
+          ntiers_plus  <- if (any(strand_g == "+"))
+            max(tiers[strand_g == "+"]) else 1L
+          ntiers_minus <- if (any(strand_g == "-"))
+            max(tiers[strand_g == "-"]) else 1L
+          ntiers_flat  <- max(tiers)
         } else {
-          # Original single-stack tier assignment.
-          ord       <- order(p0)
-          ends_last <- numeric(0)
-          for (i in ord) {
-            s <- p0[i]; e <- p1[i]
-            w2 <- which(ends_last < s)
-            if (length(w2) == 0) {
-              tiers[i]   <- length(ends_last) + 1
-              ends_last  <- c(ends_last, e)
-            } else {
-              tiers[i]            <- w2[1]
-              ends_last[w2[1]]    <- e
-            }
-          }
+          tiers        <- .pack_greedy(seq_along(gids), p0, p1)
           ntiers_plus  <- max(tiers)
           ntiers_minus <- max(tiers)
+          ntiers_flat  <- max(tiers)
         }
 
         xpr <- pm$xplot_range %||% pm$xscale
@@ -254,23 +316,6 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
         x0c <- pm$inner$x0 + u0 * (pm$inner$x1 - pm$inner$x0)
         x1c <- pm$inner$x0 + u1 * (pm$inner$x1 - pm$inner$x0)
 
-        # Per-gene ymid using correct band.
-        ymid <- numeric(length(gids))
-        for (i in seq_along(gids)) {
-          if (use_sep_strands && strand_g[i] == "+") {
-            band_y0 <- plus_y0;  band_y1 <- plus_y1;  nt <- ntiers_plus
-          } else if (use_sep_strands && strand_g[i] == "-") {
-            band_y0 <- minus_y0; band_y1 <- minus_y1; nt <- ntiers_minus
-          } else {
-            band_y0 <- pm$inner$y0; band_y1 <- pm$inner$y1
-            nt <- max(tiers)
-          }
-          band_h_i <- band_y1 - band_y0
-          row_h_i  <- band_h_i / nt
-          exon_h_i <- row_h_i * self$exon_height
-          ymid[i]  <- band_y0 + (tiers[i] - 1) * row_h_i + exon_h_i / 2
-        }
-
         # TSS detection for show_start.
         tss_genomic <- setNames(numeric(length(gids)), gids)
         for (i in seq_along(gids)) {
@@ -278,22 +323,118 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
           m   <- gid_all == gid
           if (!is.null(self$tss_position) &&
               gid %in% names(self$tss_position)) {
-            tp <- self$tss_position[[gid]]
-            tss_genomic[gid] <- tp[1]
+            tss_genomic[gid] <- self$tss_position[[gid]][1]
+          } else if (strand_g[i] == "-") {
+            tss_genomic[gid] <- max(exons_end[m])
           } else {
-            # For + strand: TSS is at the leftmost start (min genomic).
-            # For - strand: TSS is at the rightmost end (max genomic).
-            if (strand_g[i] == "-") {
-              tss_genomic[gid] <- max(exons_end[m])
-            } else {
-              tss_genomic[gid] <- min(exons_start[m])
-            }
+            tss_genomic[gid] <- min(exons_start[m])
           }
         }
-
-        # Convert TSS genomic positions to NPC.
         tss_npc <- (tss_genomic - xpr[1]) / diff(xpr) *
                    (pm$inner$x1 - pm$inner$x0) + pm$inner$x0
+
+        win_ctx[[w]] <- list(
+          pm = pm, xpr = xpr, gids = gids, strand_g = strand_g,
+          label_g = label_g, color_g = color_g, tiers = tiers,
+          ntiers_plus = ntiers_plus, ntiers_minus = ntiers_minus,
+          ntiers_flat = ntiers_flat, x0c = x0c, x1c = x1c, tss_npc = tss_npc,
+          gid_all = gid_all, type_all = type_all,
+          exons_start = exons_start, exons_end = exons_end
+        )
+      }
+
+      # ── Global tier counts (constant row height across the track) ────────
+      present <- Filter(Negate(is.null), win_ctx)
+      if (length(present) == 0L) {
+        self$coordCanvas <- data.frame()
+        return(invisible())
+      }
+      if (isTRUE(self$expanded)) {
+        ntiers_global       <- exp_ntiers
+        ntiers_plus_global  <- exp_ntiers_plus
+        ntiers_minus_global <- exp_ntiers_minus
+      } else {
+        ntiers_global       <- max(vapply(present, function(c) c$ntiers_flat,  integer(1)))
+        ntiers_plus_global  <- max(vapply(present, function(c) c$ntiers_plus,  integer(1)))
+        ntiers_minus_global <- max(vapply(present, function(c) c$ntiers_minus, integer(1)))
+      }
+
+      # Glyph vertical geometry for one gene, using the *global* tier count so
+      # thickness is identical across windows. Honours pack_direction and,
+      # for non-flush labels, reserves label_row_frac of the row.
+      .glyph_geom <- function(band_y0, band_y1, nt, tier) {
+        nt    <- max(1L, nt)
+        row_h <- (band_y1 - band_y0) / nt
+        flush <- identical(self$label_position, "flush")
+        exon_scale <- self$exon_height *
+          (if (flush) 1 else (1 - self$label_row_frac))
+        exon_h <- row_h * exon_scale
+        if (identical(self$pack_direction, "top_to_bottom")) {
+          row_hi <- band_y1 - (tier - 1) * row_h
+          row_lo <- row_hi - row_h
+        } else {
+          row_lo <- band_y0 + (tier - 1) * row_h
+          row_hi <- row_lo + row_h
+        }
+        if (flush) {
+          ymid <- if (identical(self$pack_direction, "top_to_bottom"))
+            row_hi - exon_h / 2 else row_lo + exon_h / 2
+          laby <- NA_real_
+        } else if (identical(self$label_position, "above")) {
+          frac <- self$label_row_frac
+          ymid <- row_lo + (1 - frac) * row_h / 2
+          laby <- row_hi - frac * row_h / 2
+        } else {  # "below"
+          frac <- self$label_row_frac
+          ymid <- row_hi - (1 - frac) * row_h / 2
+          laby <- row_lo + frac * row_h / 2
+        }
+        list(ymid = ymid, exon_h = exon_h, laby = laby)
+      }
+
+      # ── Pass 2: build draw rows against the shared global row height ──────
+      lpos <- self$label_position
+      for (w in seq_len(nWin)) {
+        ctx <- win_ctx[[w]]
+        if (is.null(ctx)) next
+        pm       <- ctx$pm
+        xpr      <- ctx$xpr
+        gids     <- ctx$gids
+        strand_g <- ctx$strand_g
+        label_g  <- ctx$label_g
+        color_g  <- ctx$color_g
+        tiers    <- ctx$tiers
+        x0c      <- ctx$x0c
+        x1c      <- ctx$x1c
+        tss_npc  <- ctx$tss_npc
+        gid_all  <- ctx$gid_all
+        type_all <- ctx$type_all
+        exons_start <- ctx$exons_start
+        exons_end   <- ctx$exons_end
+
+        track_h <- pm$inner$y1 - pm$inner$y0
+        if (use_sep_strands) {
+          plus_y0  <- pm$inner$y0 + track_h / 2; plus_y1  <- pm$inner$y1
+          minus_y0 <- pm$inner$y0;               minus_y1 <- pm$inner$y0 + track_h / 2
+        } else {
+          plus_y0  <- pm$inner$y0; plus_y1  <- pm$inner$y1
+          minus_y0 <- pm$inner$y0; minus_y1 <- pm$inner$y1
+        }
+
+        ymid       <- numeric(length(gids))
+        exon_h_vec <- numeric(length(gids))
+        laby_vec   <- numeric(length(gids))
+        for (i in seq_along(gids)) {
+          g <- if (use_sep_strands && strand_g[i] == "+")
+                 .glyph_geom(plus_y0,  plus_y1,  ntiers_plus_global,  tiers[i])
+               else if (use_sep_strands && strand_g[i] == "-")
+                 .glyph_geom(minus_y0, minus_y1, ntiers_minus_global, tiers[i])
+               else
+                 .glyph_geom(pm$inner$y0, pm$inner$y1, ntiers_global, tiers[i])
+          ymid[i]       <- g$ymid
+          exon_h_vec[i] <- g$exon_h
+          laby_vec[i]   <- g$laby
+        }
 
         for (i in seq_along(gids)) {
           gene_id <- gids[i]
@@ -302,18 +443,9 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
           start_sub <- exons_start[m]
           end_sub   <- exons_end[m]
 
-          # Compute exon_h for this gene from its band.
-          if (use_sep_strands && strand_g[i] == "+") {
-            nt_i <- ntiers_plus
-            bh_i <- plus_y1 - plus_y0
-          } else if (use_sep_strands && strand_g[i] == "-") {
-            nt_i <- ntiers_minus
-            bh_i <- minus_y1 - minus_y0
-          } else {
-            nt_i <- max(tiers)
-            bh_i <- pm$inner$y1 - pm$inner$y0
-          }
-          exon_h <- (bh_i / nt_i) * self$exon_height
+          # Height computed in Pass 2 against the shared global row count.
+          exon_h <- exon_h_vec[i]
+          laby_i <- laby_vec[i]
 
           # ── style_type = "gene": one chevron polygon row per gene ───────
           if (self$style_type == "gene") {
@@ -338,6 +470,8 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
               tss_x           = tss_npc[gene_id],
               chevron_npc     = chev,
               use_sep_strands = use_sep_strands,
+              label_pos       = lpos,
+              label_y         = laby_i,
               panel_y0        = pm$inner$y0,
               panel_y1        = pm$inner$y1,
               stringsAsFactors = FALSE,
@@ -364,6 +498,8 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
               tss_x           = tss_npc[gene_id],
               chevron_npc     = NA_real_,
               use_sep_strands = use_sep_strands,
+              label_pos       = lpos,
+              label_y         = laby_i,
               panel_y0        = pm$inner$y0,
               panel_y1        = pm$inner$y1,
               stringsAsFactors = FALSE,
@@ -397,6 +533,8 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
               tss_x           = tss_npc[gene_id],
               chevron_npc     = NA_real_,
               use_sep_strands = use_sep_strands,
+              label_pos       = lpos,
+              label_y         = laby_i,
               panel_y0        = pm$inner$y0,
               panel_y1        = pm$inner$y1,
               stringsAsFactors = FALSE,
@@ -433,6 +571,8 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
             tss_x           = tss_npc[gene_id],
             chevron_npc     = NA_real_,
             use_sep_strands = use_sep_strands,
+            label_pos       = lpos,
+            label_y         = laby_i,
             panel_y0        = pm$inner$y0,
             panel_y1        = pm$inner$y1,
             stringsAsFactors = FALSE,
@@ -593,41 +733,56 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
         else
           list(x_pos = "strand", y_pos = "center")
 
-        labx <- switch(lp$x_pos,
-          start  = x0b,
-          end    = x1b,
-          strand = if (dir > 0) x0b - self$label_offset
-                   else         x1b + self$label_offset
-        )
+        # label_position = "above"/"below" centres the label horizontally over
+        # the gene body at the reserved-row y computed in prep(). An explicit
+        # gene.label$position still wins (handled by the else branch).
+        stack_lbl <- self$label_position %in% c("above", "below") &&
+          (is.null(gl_aes) || is.null(gl_aes$position))
 
-        default_hjust_str <- switch(lp$x_pos,
-          start  = "left",
-          end    = "right",
-          strand = if (dir > 0) "right" else "left"
-        )
-
-        # Resolve y from exon bounds when available
-        exon_rows <- sub[!is.na(sub$exon_y0) &
-                         (sub$draw_box %in% TRUE), ]
-        if (nrow(exon_rows) > 0) {
-          exon_top    <- max(exon_rows$exon_y1, na.rm = TRUE)
-          exon_bottom <- min(exon_rows$exon_y0, na.rm = TRUE)
+        if (stack_lbl) {
+          labx <- (x0b + x1b) / 2
+          laby <- sub$label_y[1]
+          if (!is.finite(laby))
+            laby <- if (self$label_position == "above") ym + 0.02 else ym - 0.02
+          default_hjust_str <- "center"
+          default_vjust_str <- "center"
         } else {
-          exon_top    <- ym + 0.01
-          exon_bottom <- ym - 0.01
+          labx <- switch(lp$x_pos,
+            start  = x0b,
+            end    = x1b,
+            strand = if (dir > 0) x0b - self$label_offset
+                     else         x1b + self$label_offset
+          )
+
+          default_hjust_str <- switch(lp$x_pos,
+            start  = "left",
+            end    = "right",
+            strand = if (dir > 0) "right" else "left"
+          )
+
+          # Resolve y from exon bounds when available
+          exon_rows <- sub[!is.na(sub$exon_y0) &
+                           (sub$draw_box %in% TRUE), ]
+          if (nrow(exon_rows) > 0) {
+            exon_top    <- max(exon_rows$exon_y1, na.rm = TRUE)
+            exon_bottom <- min(exon_rows$exon_y0, na.rm = TRUE)
+          } else {
+            exon_top    <- ym + 0.01
+            exon_bottom <- ym - 0.01
+          }
+
+          laby <- switch(lp$y_pos,
+            top    = exon_top    + 0.005,
+            bottom = exon_bottom - 0.005,
+            center = ym
+          )
+
+          default_vjust_str <- switch(lp$y_pos,
+            top    = "bottom",
+            bottom = "top",
+            center = "center"
+          )
         }
-
-        laby <- switch(lp$y_pos,
-          top    = exon_top    + 0.005,
-          bottom = exon_bottom - 0.005,
-          center = ym
-        )
-
-        default_vjust_str <- switch(lp$y_pos,
-          top    = "bottom",
-          bottom = "top",
-          center = "center"
-        )
 
         just_h <- lbl_hjust %||% default_hjust_str
         just_v <- lbl_vjust %||% default_vjust_str
@@ -708,6 +863,24 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
 #'   backbone with exon/UTR boxes; `"gene"` draws a single chevron-shaped
 #'   polygon spanning the gene extent (no exon detail); `"point"` draws a
 #'   single filled circle at the TSS. Labels are drawn in all three modes.
+#' @param label_position Character. One of `"flush"` (default), `"above"`, or
+#'   `"below"`. `"flush"` places the label inline against the gene's 5'/3' end
+#'   (current behaviour); `"above"`/`"below"` centre the label horizontally
+#'   over the gene body and offset it vertically within the gene's tier row.
+#' @param label_row_frac Numeric in `[0, 1)`. Fraction of each tier row
+#'   reserved for the label text when `label_position` is `"above"`/`"below"`;
+#'   the glyph height shrinks accordingly so labels do not collide with the
+#'   next tier. Default `0.35`. Ignored for `"flush"`.
+#' @param pack_direction Character. One of `"bottom_to_top"` (default) or
+#'   `"top_to_bottom"`. `"bottom_to_top"` draws tier 1 at the track bottom and
+#'   stacks upward; `"top_to_bottom"` draws tier 1 at the track top and stacks
+#'   downward. Tier *numbers* keep meaning packing order in both cases.
+#' @param expanded Logical. When `TRUE`, the greedy overlap packing is skipped
+#'   and every gene is given its own tier (one gene per row), ordered by
+#'   genomic start (ties broken by label). Tier assignment is consistent
+#'   across all windows in the track. Default `FALSE`.
+#' @param label_pad Numeric. Reserved for forward-compatibility; does not
+#'   currently affect tier packing. Default `50000`.
 #' @param ... Additional arguments reserved for future use.
 #' @return A `SeqGeneR6` instance.
 #' @examples
@@ -719,6 +892,11 @@ seq_gene <- function(data = NULL, mapping = NULL, aesthetics = aes(),
                      tss_position     = NULL,
                      separate_strands = FALSE,
                      style_type       = c("exon", "gene", "point"),
+                     label_position   = c("flush", "above", "below"),
+                     label_row_frac   = 0.35,
+                     pack_direction   = c("bottom_to_top", "top_to_bottom"),
+                     expanded         = FALSE,
+                     label_pad        = 50000,
                      ...) {
   SeqGeneR6$new(
     data             = data,
@@ -729,6 +907,11 @@ seq_gene <- function(data = NULL, mapping = NULL, aesthetics = aes(),
     tss_position     = tss_position,
     separate_strands = separate_strands,
     style_type       = style_type,
+    label_position   = label_position,
+    label_row_frac   = label_row_frac,
+    pack_direction   = pack_direction,
+    expanded         = expanded,
+    label_pad        = label_pad,
     ...
   )
 }
