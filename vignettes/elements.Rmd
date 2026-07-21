@@ -661,10 +661,15 @@ Genes that straddle a window edge are handled by `oob`, which now defaults to
 out-of-window portions (the previous default) or `oob = "remove"` to drop any
 gene not entirely within the window.
 
+Vertical spacing between gene rows is controlled by `exon_height` (the fraction
+of each tier row the glyph fills, default `0.8`). Lower it to spread crowded
+genes apart; for very dense tracks, combine it with a larger `track_height`.
+
 ```{r gene-oob, eval = FALSE}
 seq_gene(map(group = gene_id, strand = strand_col, label = gene_name,
              type = feat_type),
          exon_lwd = 0.8, exon_border_col = "grey20",
+         exon_height = 0.6,        # more padding between rows
          show_start = TRUE, oob = "truncate")
 ```
 

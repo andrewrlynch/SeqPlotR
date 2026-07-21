@@ -158,12 +158,18 @@ seq_scale_fill_discrete <- function(...) {
 #'   are not base `pretty()` arguments (such as `bounds` or `f.min`) will
 #'   error from R.
 #' @param unit One of `"Mb"` (megabases), `"Kb"` (kilobases), or `"bp"`
-#'   (base pairs). Controls the divisor applied to raw genomic tick values
-#'   when formatting axis labels (e.g. `unit = "Mb"` divides by 1e6 so
-#'   100,000,000 renders as `100`). When `NULL` (default), the unit is
-#'   inferred from the narrowest window width (>= 1 Mb → Mb; >= 100 bp → Kb;
-#'   otherwise bp).  Setting `unit` also overrides any `scale_factor` or
-#'   `mcols(windows)$scale` derivation.
+#'   (base pairs); case-insensitive. Controls the divisor applied to raw
+#'   genomic tick values when formatting axis labels (e.g. `unit = "Mb"`
+#'   divides by 1e6 so 100,000,000 renders as `100`). When `NULL` (default),
+#'   the unit is inferred from the narrowest window width
+#'   (>= 1 Mb → Mb; >= 100 bp → Kb; otherwise bp). Setting `unit` also
+#'   overrides any `scale_factor` or `mcols(windows)$scale` derivation, and
+#'   applies in every layout mode (including `combine_windows` and multi-y
+#'   tracks).
+#' @param digits Optional integer. Number of decimal places to show on genomic
+#'   tick labels. `NULL` (default) keeps the current adaptive formatting.
+#'   Useful with fractional units, e.g. `unit = "Mb", digits = 2` renders a
+#'   300 kb coordinate as `0.30 Mb`.
 #' @param unit.label Controls where the unit string is appended to axis labels.
 #'   Only has an effect when `unit` is also set. One of:
 #'   \describe{
@@ -185,13 +191,27 @@ seq_scale_genomic <- function(windows = NULL, scale_factor = NULL,
                               oob = c("exclude", "perimeter"),
                               pretty = NULL,
                               unit = NULL,
-                              unit.label = "last_in_track") {
+                              unit.label = "last_in_track",
+                              digits = NULL) {
   cap <- match.arg(cap)
   oob <- match.arg(oob)
   if (!is.null(windows) && !inherits(windows, "GRanges"))
     stop("`windows` must be a GRanges object or NULL.", call. = FALSE)
-  if (!is.null(unit))
-    unit <- match.arg(unit, c("Mb", "Kb", "bp"))
+  if (!is.null(unit)) {
+    # Accept case-insensitive spellings (e.g. "mb", "MB", "kb") and normalise
+    # to the canonical "Mb" / "Kb" / "bp".
+    canon <- c(mb = "Mb", kb = "Kb", bp = "bp")
+    key   <- tolower(as.character(unit)[1])
+    if (!key %in% names(canon))
+      stop("`unit` must be one of \"Mb\", \"Kb\", or \"bp\".", call. = FALSE)
+    unit <- canon[[key]]
+  }
+  if (!is.null(digits)) {
+    digits <- as.integer(digits)
+    if (length(digits) != 1L || is.na(digits) || digits < 0L)
+      stop("`digits` must be a single non-negative integer or NULL.",
+           call. = FALSE)
+  }
   if (isTRUE(unit.label))         unit.label <- "last_in_track"
   if (identical(unit.label, FALSE)) unit.label <- "none"
   unit.label <- match.arg(unit.label,
@@ -212,7 +232,7 @@ seq_scale_genomic <- function(windows = NULL, scale_factor = NULL,
          breaks = breaks, minor_breaks = minor_breaks,
          expand = expand, cap = cap, labels = labels,
          oob = oob, pretty = pretty,
-         unit = unit, unit.label = unit.label),
+         unit = unit, unit.label = unit.label, digits = digits),
     class = c("SeqScaleGenomic", "SeqPositionScale")
   )
 }

@@ -190,11 +190,19 @@ SeqHighlightR6 <- R6::R6Class("SeqHighlight",
 
       regions <- split(df, df$region_id)
       for (rdf in regions) {
-        # A region can occupy more than one window; each window forms its own
-        # disjoint vertical ribbon.
-        for (piece in split(rdf, rdf$window_idx)) {
-          if (nrow(piece) == 0L) next
-          draw_ribbon(piece)
+        # Common case: one rectangle per track for this region -> a single
+        # ribbon connects them all, even when tracks have different window
+        # layouts (e.g. overview over zoom) and so differ in `window_idx`.
+        # Only when some track contributes more than one rectangle (a genuine
+        # multi-window-within-a-track region) do we split into disjoint
+        # per-window columns.
+        if (all(table(rdf$track_pos) == 1L)) {
+          draw_ribbon(rdf)
+        } else {
+          for (piece in split(rdf, rdf$window_idx)) {
+            if (nrow(piece) == 0L) next
+            draw_ribbon(piece)
+          }
         }
       }
       invisible()

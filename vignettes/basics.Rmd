@@ -51,6 +51,18 @@ consistent across panels. Override per-track with
 `mcols(windows)$scale` directly (highest priority). The examples below
 use 2 Mb windows, which auto-infer the Mb unit.
 
+To **force** a specific unit regardless of window width — for example to
+show a few-hundred-kb window in Mb rather than the auto-detected kb — pass
+`unit` to `seq_scale_genomic()`; it is case-insensitive and applies in every
+layout mode. Add `digits` to fix the number of decimal places:
+
+```{r unit-override, eval = FALSE}
+seq_track(
+  windows = GRanges("chr1", IRanges(1e6, 1.3e6)),   # 300 kb -> auto = kb
+  scale_x = seq_scale_genomic(unit = "Mb", digits = 2)  # -> "1.00 Mb", ...
+)
+```
+
 ```{r load}
 library(SeqPlotR)
 library(GenomicRanges)

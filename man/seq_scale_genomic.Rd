@@ -15,7 +15,8 @@ seq_scale_genomic(
   oob = c("exclude", "perimeter"),
   pretty = NULL,
   unit = NULL,
-  unit.label = "last_in_track"
+  unit.label = "last_in_track",
+  digits = NULL
 )
 }
 \arguments{
@@ -52,12 +53,14 @@ are not base \code{pretty()} arguments (such as \code{bounds} or \code{f.min}) w
 error from R.}
 
 \item{unit}{One of \code{"Mb"} (megabases), \code{"Kb"} (kilobases), or \code{"bp"}
-(base pairs). Controls the divisor applied to raw genomic tick values
-when formatting axis labels (e.g. \code{unit = "Mb"} divides by 1e6 so
-100,000,000 renders as \code{100}). When \code{NULL} (default), the unit is
-inferred from the narrowest window width (>= 1 Mb → Mb; >= 100 bp → Kb;
-otherwise bp).  Setting \code{unit} also overrides any \code{scale_factor} or
-\code{mcols(windows)$scale} derivation.}
+(base pairs); case-insensitive. Controls the divisor applied to raw
+genomic tick values when formatting axis labels (e.g. \code{unit = "Mb"}
+divides by 1e6 so 100,000,000 renders as \code{100}). When \code{NULL} (default),
+the unit is inferred from the narrowest window width
+(>= 1 Mb → Mb; >= 100 bp → Kb; otherwise bp). Setting \code{unit} also
+overrides any \code{scale_factor} or \code{mcols(windows)$scale} derivation, and
+applies in every layout mode (including \code{combine_windows} and multi-y
+tracks).}
 
 \item{unit.label}{Controls where the unit string is appended to axis labels.
 Only has an effect when \code{unit} is also set. One of:
@@ -71,6 +74,11 @@ individual window panel.}
 \code{" (unit)"} to the axis title (e.g. \code{"chr1 (Mb)"}).}
 \item{\code{"none"} / \code{FALSE}}{Never append the unit string anywhere.}
 }}
+
+\item{digits}{Optional integer. Number of decimal places to show on genomic
+tick labels. \code{NULL} (default) keeps the current adaptive formatting.
+Useful with fractional units, e.g. \verb{unit = "Mb", digits = 2} renders a
+300 kb coordinate as \verb{0.30 Mb}.}
 }
 \value{
 A \code{SeqScaleGenomic} / \code{SeqPositionScale} object.

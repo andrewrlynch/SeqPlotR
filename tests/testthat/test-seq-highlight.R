@@ -188,3 +188,36 @@ test_that("a multi-region highlight strokes one path per disjoint region", {
   grDevices::pdf(NULL); on.exit(grDevices::dev.off())
   expect_equal(hl_count_polygons(lnk), 2L)
 })
+
+test_that("region connects across tracks with different window layouts (batch 3)", {
+  # Regression: overview (t0) with the region in a non-first window and a
+  # zoom track (t1) with it in window 1 must draw ONE connected ribbon, not
+  # two disconnected rectangles.
+  lnk <- seq_highlight(t0 = 1, t1 = 2,
+                       aesthetics = aes(color = "black", fill = "grey50"))
+  lnk$coordCanvas <- data.frame(
+    region_id  = c(1, 1),
+    track_pos  = c(1, 2),
+    window_idx = c(2, 1),          # different window_idx per track
+    xL = c(0.30, 0.28), xR = c(0.60, 0.62),
+    y0_npc = c(0.6, 0.1), y1_npc = c(0.9, 0.4),
+    stringsAsFactors = FALSE
+  )
+  grDevices::pdf(NULL); on.exit(grDevices::dev.off())
+  expect_equal(hl_count_polygons(lnk), 1L)
+})
+
+test_that("multi-window-within-a-track region still splits into pieces (batch 3)", {
+  lnk <- seq_highlight(t0 = 1, t1 = 2,
+                       aesthetics = aes(color = "black", fill = "grey50"))
+  lnk$coordCanvas <- data.frame(
+    region_id  = c(1, 1, 1, 1),
+    track_pos  = c(1, 2, 1, 2),
+    window_idx = c(1, 1, 2, 2),    # two rects per track -> two disjoint columns
+    xL = c(0.1, 0.1, 0.6, 0.6), xR = c(0.3, 0.3, 0.8, 0.8),
+    y0_npc = c(0.6, 0.1, 0.6, 0.1), y1_npc = c(0.9, 0.4, 0.9, 0.4),
+    stringsAsFactors = FALSE
+  )
+  grDevices::pdf(NULL); on.exit(grDevices::dev.off())
+  expect_equal(hl_count_polygons(lnk), 2L)
+})

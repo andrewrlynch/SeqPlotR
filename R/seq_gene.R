@@ -188,6 +188,9 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
     #' @param tss_run Numeric. TSS arm run (npc). Default `0.018`.
     #' @param oob Character. Out-of-bounds gene handling: `"keep"`,
     #'   `"truncate"` (default), or `"remove"`.
+    #' @param exon_height Numeric in `(0, 1]`. Fraction of each tier row the gene
+    #'   glyph fills; the remainder is vertical padding between rows. Lower it to
+    #'   space genes further apart. Default `0.8`.
     #' @param ... Unused.
     initialize = function(data = NULL, mapping = NULL, aesthetics = aes(),
                           backbone_type    = "arrow",
@@ -200,6 +203,7 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
                           pack_direction   = c("bottom_to_top", "top_to_bottom"),
                           expanded         = FALSE,
                           label_pad        = 50000,
+                          exon_height      = 0.8,
                           backbone_lwd     = 1,
                           exon_lwd         = NA,
                           exon_border_col  = NA,
@@ -226,6 +230,7 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
       self$pack_direction   <- pack_direction
       self$expanded         <- isTRUE(expanded)
       self$label_pad        <- label_pad
+      self$exon_height      <- exon_height
       self$backbone_lwd     <- backbone_lwd
       self$exon_lwd         <- exon_lwd
       self$exon_border_col  <- exon_border_col
@@ -840,17 +845,17 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
           stem_y1 <- ym + rise
           arm_end <- tss_x + dir * run
 
-          # Vertical stem
+          # Vertical stem (butt caps for clean, square edges)
           grid::grid.lines(
             x  = grid::unit(c(tss_x, tss_x), "npc"),
             y  = grid::unit(c(ym, stem_y1), "npc"),
-            gp = grid::gpar(col = col, lwd = self$tss_stem_lwd)
+            gp = grid::gpar(col = col, lwd = self$tss_stem_lwd, lineend = "butt")
           )
           # Horizontal arm
           grid::grid.segments(
             x0 = grid::unit(tss_x,   "npc"), x1 = grid::unit(arm_end, "npc"),
             y0 = grid::unit(stem_y1, "npc"), y1 = grid::unit(stem_y1, "npc"),
-            gp = grid::gpar(col = col, lwd = self$tss_stem_lwd)
+            gp = grid::gpar(col = col, lwd = self$tss_stem_lwd, lineend = "butt")
           )
           # Solid filled triangle arrowhead, led slightly ahead of the arm.
           tri_w <- grid::convertWidth(
@@ -1044,6 +1049,10 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
 #'   clip straddling genes to the window), `"keep"` (draw out-of-window
 #'   portions — the prior behaviour), or `"remove"` (drop any gene not entirely
 #'   within the window).
+#' @param exon_height Numeric in `(0, 1]`. Fraction of each tier row the gene
+#'   glyph fills; the rest is vertical padding between rows. Lower it to spread
+#'   genes further apart (helpful for dense tracks, alongside `track_height`).
+#'   Default `0.8`.
 #' @param ... Additional arguments reserved for future use.
 #' @return A `SeqGeneR6` instance.
 #' @examples
@@ -1060,6 +1069,7 @@ seq_gene <- function(data = NULL, mapping = NULL, aesthetics = aes(),
                      pack_direction   = c("bottom_to_top", "top_to_bottom"),
                      expanded         = FALSE,
                      label_pad        = 50000,
+                     exon_height      = 0.8,
                      backbone_lwd     = 1,
                      exon_lwd         = NA,
                      exon_border_col  = NA,
@@ -1084,6 +1094,7 @@ seq_gene <- function(data = NULL, mapping = NULL, aesthetics = aes(),
     pack_direction   = pack_direction,
     expanded         = expanded,
     label_pad        = label_pad,
+    exon_height      = exon_height,
     backbone_lwd     = backbone_lwd,
     exon_lwd         = exon_lwd,
     exon_border_col  = exon_border_col,

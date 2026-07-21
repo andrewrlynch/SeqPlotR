@@ -58,9 +58,15 @@
 #' trims whitespace. A separate helper so the axis draw code reads clean.
 #'
 #' @param x Numeric vector of tick values.
+#' @param digits Optional integer. When non-NULL, values are rounded to and
+#'   shown with exactly this many decimal places; otherwise adaptive default
+#'   formatting is used.
 #' @return Character vector of formatted labels.
 #' @keywords internal
-.axis_fmt <- function(x) {
+.axis_fmt <- function(x, digits = NULL) {
+  if (!is.null(digits))
+    return(format(round(x, digits), big.mark = ",", scientific = FALSE,
+                  trim = TRUE, nsmall = digits))
   format(x, big.mark = ",", scientific = FALSE, trim = TRUE)
 }
 
@@ -205,8 +211,11 @@
     base$inner$x0 + (v - base$xscale[1]) / span *
       (base$inner$x1 - base$inner$x0)
   }
-  # Default scale factor: Mb when scale type is genomic, else 1.
+  # Scale factor: inherit the base panel's (which layout already set from a
+  # user `unit`, if any) so a manual unit is honoured here too; fall back to
+  # Mb for genomic scales, else 1.
   default_sf <- if (identical(base$x_scale_type, "genomic")) 1e-6 else 1
+  sf <- base$xScaleFactor %||% default_sf
 
   lapply(seq_along(vmap$seqnames), function(k) {
     win <- base
@@ -214,7 +223,7 @@
     win$data_x  <- win$xscale
     win$inner$x0 <- to_npc_x(vmap$virtual_start[k])
     win$inner$x1 <- to_npc_x(vmap$virtual_end[k])
-    win$xScaleFactor <- default_sf
+    win$xScaleFactor <- sf
     win$.combined_window_label <- paste0(
       vmap$seqnames[k], ": ",
       format(vmap$genomic_start[k], big.mark = ",", scientific = FALSE), "-",
@@ -243,7 +252,10 @@
 .expand_panels_for_multi_y_axis <- function(panels) {
   if (length(panels) == 0L) return(panels)
   base <- panels[[1]]
+  # Inherit the base panel's y factor (layout sets it from a user `unit` when
+  # present) so a manual unit is honoured; fall back to Mb / 1 otherwise.
   default_sf <- if (identical(base$y_scale_type, "genomic")) 1e-6 else 1
+  sf <- base$yScaleFactor %||% default_sf
 
   y_subs <- base$y_sub_panels
   if (!is.null(y_subs) && length(y_subs) > 0L) {
@@ -254,7 +266,7 @@
       p$data_y <- sub$yscale
       p$inner$y0 <- sub$y0
       p$inner$y1 <- sub$y1
-      p$yScaleFactor <- default_sf
+      p$yScaleFactor <- sf
       p$.combined_window_label <- paste0(
         sub$seqname, ": ",
         format(sub$yscale[1], big.mark = ",", scientific = FALSE), "-",
@@ -276,7 +288,7 @@
       p$data_y <- p$yscale
       p$inner$y0 <- to_npc_y(vmap$virtual_start[k])
       p$inner$y1 <- to_npc_y(vmap$virtual_end[k])
-      p$yScaleFactor <- default_sf
+      p$yScaleFactor <- sf
       p$.combined_window_label <- paste0(
         vmap$seqnames[k], ": ",
         format(vmap$genomic_start[k], big.mark = ",", scientific = FALSE), "-",
@@ -469,7 +481,8 @@
       lo_val <- scale_lim[1] * sf
       hi_val <- scale_lim[2] * sf
       range_label <- sprintf("[%s\u2013%s]",
-                             .axis_fmt(lo_val), .axis_fmt(hi_val))
+                             .axis_fmt(lo_val, scale$digits),
+                             .axis_fmt(hi_val, scale$digits))
 
       offset <- spec$text$offset %||% (if (is_x) 0.015 else 0.010)
 
@@ -559,7 +572,7 @@
             } else {
               if (identical(scale$type, "genomic")) (win$yScaleFactor %||% 1e-6) else 1
             }
-            lbl <- .axis_fmt(as.numeric(lbl) * scaleF)
+            lbl <- .axis_fmt(as.numeric(lbl) * scaleF, scale$digits)
             if (!is.null(unit_str)) {
               add_unit <- switch(ul_mode,
                 all            = TRUE,

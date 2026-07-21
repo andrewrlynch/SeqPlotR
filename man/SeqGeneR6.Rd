@@ -137,6 +137,7 @@ Construct a SeqGeneR6.
   pack_direction = c("bottom_to_top", "top_to_bottom"),
   expanded = FALSE,
   label_pad = 50000,
+  exon_height = 0.8,
   backbone_lwd = 1,
   exon_lwd = NA,
   exon_border_col = NA,
@@ -192,6 +193,10 @@ overlap, consistent across all windows. Default \code{FALSE}.}
 
 \item{\code{label_pad}}{Numeric. Extra bp padding beyond the measured label
 width, applied on the label side in \code{"flush"} mode. Default \code{50000}.}
+
+\item{\code{exon_height}}{Numeric in \verb{(0, 1]}. Fraction of each tier row the gene
+glyph fills; the remainder is vertical padding between rows. Lower it to
+space genes further apart. Default \code{0.8}.}
 
 \item{\code{backbone_lwd}}{Numeric. Backbone (and chevron) line width. Default \code{1}.}
 

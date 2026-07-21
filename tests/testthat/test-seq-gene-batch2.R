@@ -141,3 +141,50 @@ test_that("oob 'remove' drops straddling genes; 'truncate' clips; 'keep' keeps",
 test_that("oob default is 'truncate'", {
   expect_equal(seq_gene()$oob, "truncate")
 })
+
+# ── Item (batch 3): exon_height controls vertical row spacing ─────────────────
+
+test_that("exon_height is a working constructor arg (dense multi-tier track)", {
+  # Five mutually overlapping genes -> five tiers.
+  gr <- GRanges("chr1", IRanges(c(100, 120, 140, 160, 180),
+                                c(300, 320, 340, 360, 380)),
+                gene_id = paste0("g", 1:5), gene_name = paste0("g", 1:5),
+                strand_col = rep("+", 5), feat_type = rep("exon", 5))
+  win <- GRanges("chr1", IRanges(1, 500))
+  box_h <- function(eh) {
+    el <- seq_gene(gr, gene_map2(), exon_height = eh)
+    el$prep(list(.mk_pm(gr, 1, 500)), win)
+    (el$coordCanvas$exon_y1 - el$coordCanvas$exon_y0)[1]
+  }
+  h8 <- box_h(0.8); h4 <- box_h(0.4)
+  expect_lt(h4, h8)                      # lower exon_height -> thinner glyph
+  expect_equal(h4 / h8, 0.5, tolerance = 1e-6)
+})
+
+test_that("default exon_height (0.8) is unchanged", {
+  expect_equal(seq_gene()$exon_height, 0.8)
+})
+
+# ── Item (batch 3): TSS stem/arm use butt line caps ───────────────────────────
+
+test_that("show_start TSS stem/arm render with butt line caps", {
+  gr <- GRanges("chr1", IRanges(c(100, 400), c(300, 600)),
+                gene_id = c("g", "g"), gene_name = c("G", "G"),
+                strand_col = c("+", "+"), feat_type = c("exon", "exon"))
+  win <- GRanges("chr1", IRanges(1, 1000))
+  # backbone_type = "solid" so there are no chevron-arrow segments (which are
+  # out of scope); the only line/segment grobs are the backbone and the TSS
+  # stem + arm, all of which must use butt caps.
+  el <- seq_gene(gr, gene_map2(), show_start = TRUE, backbone_type = "solid")
+  el$prep(list(.mk_pm(gr, 1, 1000)), win)
+  grDevices::pdf(NULL); on.exit(grDevices::dev.off())
+  grid::grid.newpage(); grid::pushViewport(grid::viewport()); el$draw()
+  gl <- grid::grid.ls(print = FALSE)
+  seg_names <- gl$name[grepl("segments|lines", gl$name, ignore.case = TRUE)]
+  expect_gt(length(seg_names), 0L)
+  ends <- vapply(seg_names, function(nm) {
+    le <- grid::grid.get(nm)$gp$lineend
+    if (is.null(le)) "round" else le
+  }, character(1))
+  expect_true(all(ends == "butt"))
+})
