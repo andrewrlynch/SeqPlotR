@@ -253,6 +253,21 @@ deprecated and emits a warning when used; switch to
 key still works as an alias but `window.gap.width` takes priority
 when both are set.
 
+### Track gap width
+
+The gap *between tracks* is controlled the same way, with
+`aes("track.gap.width" = <npc>)` set at the plot level (default
+`0.01`). Increasing it widens the space between stacked (or
+side-by-side) tracks and shrinks the tracks proportionally. The older
+`aes(track_gaps = ...)` key remains a supported alias, with
+`track.gap.width` taking priority when both are set.
+
+```{r track-gap, eval = FALSE}
+seq_plot(aesthetics = aes("track.gap.width" = 0.04)) %+%
+  seq_track(data = d, windows = win) %+% seq_point(map(x = start, y = score)) %__%
+  seq_track(data = d, windows = win) %+% seq_line(map(x = start, y = score))
+```
+
 ### Margin recipes
 
 The five zones are independent knobs. The examples below share a

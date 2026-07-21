@@ -153,9 +153,11 @@ SeqHighlightR6 <- R6::R6Class("SeqHighlight",
       invisible()
     },
 
-    #' @description Render the highlight band: one filled rectangle per
-    #'   per-track / per-window slice, and a connecting trapezoid in the
-    #'   gap between adjacent tracks (matched by `window_idx`).
+    #' @description Render the highlight band. For each region, the union of
+    #'   its per-track rectangles and the bridging trapezoids between adjacent
+    #'   tracks is traced as a *single* closed polygon (one outer boundary) so
+    #'   fill and border stroke apply once, with no internal seams. A region
+    #'   that is disjoint across windows produces one polygon per piece.
     draw = function() {
       df <- self$coordCanvas
       if (is.null(df) || nrow(df) == 0L) return(invisible())
@@ -166,51 +168,33 @@ SeqHighlightR6 <- R6::R6Class("SeqHighlight",
       fill2 <- grDevices::adjustcolor(fill, alpha.f = alpha)
       gp <- grid::gpar(fill = fill2, col = col, lwd = lwd)
 
+      # Trace the outer boundary of a vertical ribbon of stacked track
+      # rectangles (ordered top -> bottom). Down the left edges, up the right
+      # edges; the diagonals between a track's bottom and the next track's top
+      # form the bridging trapezoids automatically.
+      draw_ribbon <- function(piece) {
+        ord   <- order(piece$y1_npc, decreasing = TRUE)  # topmost first
+        p     <- piece[ord, , drop = FALSE]
+        k     <- nrow(p)
+        left_x  <- as.numeric(rbind(p$xL, p$xL))          # (top, bot) per track
+        left_y  <- as.numeric(rbind(p$y1_npc, p$y0_npc))
+        ri      <- rev(seq_len(k))
+        right_x <- as.numeric(rbind(p$xR[ri], p$xR[ri]))  # (bot, top) per track
+        right_y <- as.numeric(rbind(p$y0_npc[ri], p$y1_npc[ri]))
+        grid::grid.polygon(
+          x  = grid::unit(c(left_x, right_x), "npc"),
+          y  = grid::unit(c(left_y, right_y), "npc"),
+          gp = gp
+        )
+      }
+
       regions <- split(df, df$region_id)
       for (rdf in regions) {
-        # Per-track rectangles inside each panel
-        for (i in seq_len(nrow(rdf))) {
-          grid::grid.polygon(
-            x  = grid::unit(c(rdf$xL[i], rdf$xR[i],
-                              rdf$xR[i], rdf$xL[i]), "npc"),
-            y  = grid::unit(c(rdf$y0_npc[i], rdf$y0_npc[i],
-                              rdf$y1_npc[i], rdf$y1_npc[i]), "npc"),
-            gp = gp
-          )
-        }
-
-        # Bridging trapezoids between adjacent tracks (matched by window_idx).
-        # Order tracks top-to-bottom by y1_npc descending so the upper track
-        # comes first in each pair.
-        ord <- order(rdf$y1_npc, decreasing = TRUE)
-        sorted <- rdf[ord, , drop = FALSE]
-        positions <- unique(sorted$track_pos)
-        if (length(positions) < 2L) next
-        for (p_i in seq_len(length(positions) - 1L)) {
-          upper <- sorted[sorted$track_pos == positions[p_i],   , drop = FALSE]
-          lower <- sorted[sorted$track_pos == positions[p_i + 1L], , drop = FALSE]
-          if (nrow(upper) == 0L || nrow(lower) == 0L) next
-          # Match by window_idx; if exactly one in each, just connect.
-          if (nrow(upper) == 1L && nrow(lower) == 1L) {
-            pairs <- list(list(u = upper[1, ], l = lower[1, ]))
-          } else {
-            common <- intersect(upper$window_idx, lower$window_idx)
-            pairs <- lapply(common, function(w) list(
-              u = upper[upper$window_idx == w, ][1, ],
-              l = lower[lower$window_idx == w, ][1, ]
-            ))
-          }
-          for (pr in pairs) {
-            u <- pr$u; l <- pr$l
-            # Upper rectangle bottom edge -> lower rectangle top edge
-            y_top <- min(u$y0_npc, u$y1_npc)
-            y_bot <- max(l$y0_npc, l$y1_npc)
-            grid::grid.polygon(
-              x  = grid::unit(c(u$xL, u$xR, l$xR, l$xL), "npc"),
-              y  = grid::unit(c(y_top, y_top, y_bot, y_bot), "npc"),
-              gp = gp
-            )
-          }
+        # A region can occupy more than one window; each window forms its own
+        # disjoint vertical ribbon.
+        for (piece in split(rdf, rdf$window_idx)) {
+          if (nrow(piece) == 0L) next
+          draw_ribbon(piece)
         }
       }
       invisible()

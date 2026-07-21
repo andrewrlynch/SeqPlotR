@@ -9,7 +9,10 @@ seq_lollipop(data = NULL, mapping = NULL, aesthetics = aes(), ...)
 \arguments{
 \item{data}{Optional \code{GRanges}.}
 
-\item{mapping}{Optional \code{SeqMap}. Recognised fields: \code{x}, \code{y}.}
+\item{mapping}{Optional \code{SeqMap}. Recognised fields: \code{x}, \code{y}, and
+\code{color}/\code{fill}/\code{shape} (auto-scaled to a palette with a legend when
+mapped to a non-colour column, exactly as in \code{\link[=seq_point]{seq_point()}}). Values
+below \code{baseline} place the head at the value, not at the baseline.}
 
 \item{aesthetics}{Optional \code{SeqAes}. Supports \code{baseline}, \code{color},
 \code{linewidth}, \code{size}, \code{shape}, \code{alpha}.}

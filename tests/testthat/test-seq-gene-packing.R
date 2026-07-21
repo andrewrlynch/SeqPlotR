@@ -93,17 +93,20 @@ test_that("expanded = TRUE gives one tier per gene regardless of overlap", {
   expect_equal(length(unique(round(ymids, 8))), 3L)
 })
 
-test_that("expanded keeps a gene in the same relative row across windows", {
-  # Gene A appears only in window 1, but its row must be reserved everywhere.
+test_that("expanded packs per window but keeps constant glyph height", {
+  # A2: gene A is only in window 1; window 2 (B/C/D/E) must start its own
+  # tiering at 1 rather than reserving A's row. Glyph height stays constant.
   el <- seq_gene(gr_pack, gene_map(), expanded = TRUE)
   el$prep(two_win_layout, two_win)
   df <- el$coordCanvas
-  # 5 genes total -> 5 tiers; B/C/D/E in window 2 occupy tiers 2..5, never 1.
   h <- df$exon_y1 - df$exon_y0
-  expect_equal(length(unique(round(h, 8))), 1L)
-  # Row of B (global tier 2) sits above the reserved tier-1 band.
-  ya <- min(df$ymid)  # lowest occupied row in window 2
-  expect_gt(ya, 0.1)  # strictly above the track floor -> tier 1 left empty
+  expect_equal(length(unique(round(h, 8))), 1L)   # constant height preserved
+
+  # Window 1 has one gene (A) at tier 1; window 2's lowest gene is also tier 1,
+  # so both share the same bottom-row ymid — no empty reserved row.
+  ya <- df$ymid[df$gene == "A"][1]
+  w2_min <- min(df$ymid[df$gene %in% c("B", "C", "D", "E")])
+  expect_equal(w2_min, ya, tolerance = 1e-8)
 })
 
 # ── pack_direction ────────────────────────────────────────────────────────────

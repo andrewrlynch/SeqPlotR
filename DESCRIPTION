@@ -1,6 +1,6 @@
 Package: SeqPlotR
 Title: Genomic Visualization with a Layered Grammar
-Version: 0.1.0
+Version: 0.1.0.9000
 Authors@R: person("First", "Last", email = "email@example.com", role = c("aut", "cre"))
 Description: A flexible R6-based genomic visualization package with ggplot2-inspired syntax.
 License: MIT + file LICENSE

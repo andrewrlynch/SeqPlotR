@@ -18,6 +18,15 @@ seq_gene(
   pack_direction = c("bottom_to_top", "top_to_bottom"),
   expanded = FALSE,
   label_pad = 50000,
+  backbone_lwd = 1,
+  exon_lwd = NA,
+  exon_border_col = NA,
+  arrow_size = 1.5,
+  tss_arrow_size = 3,
+  tss_stem_lwd = 1.2,
+  tss_rise = NULL,
+  tss_run = 0.018,
+  oob = c("truncate", "keep", "remove"),
   ...
 )
 }
@@ -73,11 +82,37 @@ downward. Tier \emph{numbers} keep meaning packing order in both cases.}
 
 \item{expanded}{Logical. When \code{TRUE}, the greedy overlap packing is skipped
 and every gene is given its own tier (one gene per row), ordered by
-genomic start (ties broken by label). Tier assignment is consistent
-across all windows in the track. Default \code{FALSE}.}
+genomic start (ties broken by label). Ranking is per window (a gene absent
+from a window does not reserve a row there); glyph height stays constant
+across windows. Default \code{FALSE}.}
 
-\item{label_pad}{Numeric. Reserved for forward-compatibility; does not
-currently affect tier packing. Default \code{50000}.}
+\item{label_pad}{Numeric. In \code{label_position = "flush"}, extra bp padding
+added beyond the measured rendered label width when packing tiers, so
+genes whose labels would collide land on separate tiers. Default \code{50000}.}
+
+\item{backbone_lwd}{Numeric. Backbone (and chevron) line width. Default \code{1}.}
+
+\item{exon_lwd}{Numeric or \code{NA}. Exon/UTR box border width. \code{NA} (default)
+draws unbordered boxes as before; a number strokes the border.}
+
+\item{exon_border_col}{Border colour used only when \code{exon_lwd} is set.
+Default \code{NA} (falls back to the gene colour).}
+
+\item{arrow_size}{Numeric. Chevron arrowhead length in mm. Default \code{1.5}.}
+
+\item{tss_arrow_size}{Numeric. TSS marker triangle size in mm. Default \code{3}.}
+
+\item{tss_stem_lwd}{Numeric. TSS marker stem/arm line width. Default \code{1.2}.}
+
+\item{tss_rise}{Numeric or \code{NULL}. TSS stem rise in npc; \code{NULL} (default)
+derives it from the gene box height.}
+
+\item{tss_run}{Numeric. TSS arm run in npc. Default \code{0.018}.}
+
+\item{oob}{Character. Out-of-bounds gene handling: \code{"truncate"} (default,
+clip straddling genes to the window), \code{"keep"} (draw out-of-window
+portions — the prior behaviour), or \code{"remove"} (drop any gene not entirely
+within the window).}
 
 \item{...}{Additional arguments reserved for future use.}
 }

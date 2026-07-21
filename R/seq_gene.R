@@ -21,6 +21,27 @@
   )
 }
 
+# Measure the rendered width of each label, in npc, at expansion `cex`.
+#
+# `grid::stringWidth()` returns a "strwidth" unit whose stored numeric part is
+# a constant multiplier (always 1 per string); the physical width only
+# materialises when the unit is *converted*. So `as.numeric()` on it yields 1
+# for every string regardless of length — `grid::convertWidth()` is required.
+# The result is npc relative to whatever viewport is active at prep() time (the
+# default `pushViewport(viewport())` here does not rescale from its parent),
+# which is device-level npc — consistent with how `pm$inner$x0/x1` are used.
+# The tryCatch fallback only fires on a genuine device error (prep() with no
+# open device auto-opens a null device rather than throwing).
+.measure_label_npc <- function(labels, cex = 1) {
+  if (length(labels) == 0L) return(numeric(0))
+  tryCatch({
+    grid::pushViewport(grid::viewport())
+    on.exit(grid::popViewport())
+    grid::convertWidth(grid::stringWidth(labels) * cex, "npc",
+                       valueOnly = TRUE)
+  }, error = function(e) nchar(labels) * 0.01 * cex)
+}
+
 #' SeqGene R6 class
 #'
 #' Internal R6 generator backing [seq_gene()]. Inherits from
@@ -33,9 +54,9 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
     #' @field exon_height Proportion of per-tier height allocated to the
     #'   exon box.
     exon_height   = 0.8,
-    #' @field label_pad Reserved. Padding (in bp) once used to keep flush
-    #'   labels from overlapping neighbouring genes. Exposed for
-    #'   forward-compatibility; it does **not** currently affect tier packing.
+    #' @field label_pad Extra padding (in bp) added, on top of the measured
+    #'   rendered label width, to each gene's packing interval on the label
+    #'   side. Only affects `label_position = "flush"`. Default `50000`.
     label_pad     = 50000,
 
     #' @field label_position Character. One of `"flush"`, `"above"`, `"below"`.
@@ -89,6 +110,44 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
     #'   filled circle at the TSS. Default `"exon"`.
     style_type = "exon",
 
+    #' @field backbone_lwd Numeric. Backbone line width; also the default
+    #'   stroke width of the directional chevron arrows. Default `1`.
+    backbone_lwd = 1,
+
+    #' @field exon_lwd Numeric or `NA`. Exon/UTR box border width. When `NA`
+    #'   (default) boxes draw with no border (`col = NA`, current behaviour);
+    #'   when set, the border is stroked.
+    exon_lwd = NA,
+
+    #' @field exon_border_col Border colour for exon/UTR boxes, used only when
+    #'   `exon_lwd` is not `NA`. Default `NA` (inherits the gene colour).
+    exon_border_col = NA,
+
+    #' @field arrow_size Numeric. Chevron arrowhead length in millimetres.
+    #'   Default `1.5`.
+    arrow_size = 1.5,
+
+    #' @field tss_arrow_size Numeric. TSS marker arrowhead (filled triangle)
+    #'   size in millimetres. Default `3`.
+    tss_arrow_size = 3,
+
+    #' @field tss_stem_lwd Numeric. Line width of the TSS marker stem/arm.
+    #'   Default `1.2`.
+    tss_stem_lwd = 1.2,
+
+    #' @field tss_rise Numeric or `NULL`. Vertical stem rise of the TSS marker
+    #'   in npc. When `NULL` (default) it is derived from the gene box height
+    #'   (`0.9 *` box height, `0.02` fallback), matching prior behaviour.
+    tss_rise = NULL,
+
+    #' @field tss_run Numeric. Horizontal arm run of the TSS marker in npc.
+    #'   Default `0.018`.
+    tss_run = 0.018,
+
+    #' @field oob Character. Out-of-bounds handling for genes straddling a
+    #'   window edge: `"keep"`, `"truncate"` (default), or `"remove"`.
+    oob = "truncate",
+
     #' @description Construct a SeqGeneR6.
     #' @param data Optional `GRanges`.
     #' @param mapping Optional `SeqMap`. Recognised: `group`, `strand`,
@@ -115,8 +174,20 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
     #'   `"top_to_bottom"`. Physical edge tier 1 is drawn from.
     #' @param expanded Logical. When `TRUE`, one gene per tier regardless of
     #'   overlap, consistent across all windows. Default `FALSE`.
-    #' @param label_pad Numeric. Reserved; does not currently affect packing.
-    #'   Default `50000`.
+    #' @param label_pad Numeric. Extra bp padding beyond the measured label
+    #'   width, applied on the label side in `"flush"` mode. Default `50000`.
+    #' @param backbone_lwd Numeric. Backbone (and chevron) line width. Default `1`.
+    #' @param exon_lwd Numeric or `NA`. Exon/UTR box border width. Default `NA`.
+    #' @param exon_border_col Exon/UTR border colour when `exon_lwd` is set.
+    #'   Default `NA` (inherits gene colour).
+    #' @param arrow_size Numeric. Chevron arrowhead length (mm). Default `1.5`.
+    #' @param tss_arrow_size Numeric. TSS triangle size (mm). Default `3`.
+    #' @param tss_stem_lwd Numeric. TSS stem/arm line width. Default `1.2`.
+    #' @param tss_rise Numeric or `NULL`. TSS stem rise (npc); `NULL` derives it
+    #'   from box height. Default `NULL`.
+    #' @param tss_run Numeric. TSS arm run (npc). Default `0.018`.
+    #' @param oob Character. Out-of-bounds gene handling: `"keep"`,
+    #'   `"truncate"` (default), or `"remove"`.
     #' @param ... Unused.
     initialize = function(data = NULL, mapping = NULL, aesthetics = aes(),
                           backbone_type    = "arrow",
@@ -129,12 +200,22 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
                           pack_direction   = c("bottom_to_top", "top_to_bottom"),
                           expanded         = FALSE,
                           label_pad        = 50000,
+                          backbone_lwd     = 1,
+                          exon_lwd         = NA,
+                          exon_border_col  = NA,
+                          arrow_size       = 1.5,
+                          tss_arrow_size   = 3,
+                          tss_stem_lwd     = 1.2,
+                          tss_rise         = NULL,
+                          tss_run          = 0.018,
+                          oob              = c("truncate", "keep", "remove"),
                           ...) {
       super$initialize(data, mapping, aesthetics)
       backbone_type  <- match.arg(backbone_type, c("arrow", "solid", "dashed"))
       style_type     <- match.arg(style_type)
       label_position <- match.arg(label_position)
       pack_direction <- match.arg(pack_direction)
+      oob            <- match.arg(oob)
       self$backbone_type    <- backbone_type
       self$show_start       <- isTRUE(show_start)
       self$tss_position     <- tss_position
@@ -145,6 +226,15 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
       self$pack_direction   <- pack_direction
       self$expanded         <- isTRUE(expanded)
       self$label_pad        <- label_pad
+      self$backbone_lwd     <- backbone_lwd
+      self$exon_lwd         <- exon_lwd
+      self$exon_border_col  <- exon_border_col
+      self$arrow_size       <- arrow_size
+      self$tss_arrow_size   <- tss_arrow_size
+      self$tss_stem_lwd     <- tss_stem_lwd
+      self$tss_rise         <- tss_rise
+      self$tss_run          <- tss_run
+      self$oob              <- oob
     },
 
     #' @description Resolve mappings, stack genes into non-overlapping tiers,
@@ -193,8 +283,8 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
         length(unique(strand_vals[strand_vals %in% c("+", "-")])) > 1L
 
       # Global gene table — one entry per unique gene id in the whole track.
-      # Used for `expanded` row assignment (which must be identical in every
-      # window) and cheap to build regardless.
+      # Provides each gene's full genomic extent (used for oob tests) and
+      # label, plus a once-measured rendered label width in npc.
       all_gids   <- unique(group_vals)
       g_all_start <- BiocGenerics::start(eff_data)
       g_all_end   <- BiocGenerics::end(eff_data)
@@ -210,30 +300,11 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
         g_label[i]  <- label_vals[m][1]
       }
 
-      # `expanded`: assign every gene its own tier, ordered by genomic start
-      # (ties broken alphabetically by label). Under separate_strands each
-      # strand band is ranked independently.
-      global_tier      <- NULL
-      exp_ntiers       <- 1L
-      exp_ntiers_plus  <- 1L
-      exp_ntiers_minus <- 1L
-      if (isTRUE(self$expanded)) {
-        global_tier <- setNames(integer(length(all_gids)), all_gids)
-        if (use_sep_strands) {
-          for (st in c("+", "-")) {
-            sel <- which(g_strand == st)
-            if (!length(sel)) next
-            ordv <- sel[order(g_start[sel], g_label[sel])]
-            global_tier[ordv] <- seq_along(ordv)
-          }
-          exp_ntiers_plus  <- max(1L, sum(g_strand == "+"))
-          exp_ntiers_minus <- max(1L, sum(g_strand == "-"))
-        } else {
-          ordv <- order(g_start, g_label)
-          global_tier[ordv] <- seq_along(ordv)
-          exp_ntiers <- max(1L, length(all_gids))
-        }
-      }
+      # A1: rendered label width per gene (npc), measured once. Only used to
+      # pad packing intervals in `label_position = "flush"`; the width is
+      # device-relative npc (window-independent) — converted to bp per window.
+      label_npc_w <- setNames(
+        .measure_label_npc(g_label, self$label_cex), all_gids)
 
       # Greedy interval-scheduling tier assignment for a group of genes.
       # `idx` indexes into p0/p1; returns tiers aligned with `idx`.
@@ -281,17 +352,66 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
         color_g    <- vapply(gids, function(gg) color_vals[group_vals == gg][1],
                              character(1))
 
-        # Pack tiers by raw genomic extent — label space is not part of the
-        # overlap test (labels can extend outside the gene body).
+        # A6: out-of-bounds handling relative to this window, applied *before*
+        # packing so tiers reflect the clipped/removed set.
+        wstart <- BiocGenerics::start(win)
+        wend   <- BiocGenerics::end(win)
+        if (identical(self$oob, "remove")) {
+          inside <- gene_start >= wstart & gene_end <= wend
+          if (!any(inside)) next
+          gids       <- gids[inside];       gene_start <- gene_start[inside]
+          gene_end   <- gene_end[inside];   strand_g   <- strand_g[inside]
+          label_g    <- label_g[inside];    color_g    <- color_g[inside]
+        } else if (identical(self$oob, "truncate")) {
+          gene_start  <- pmax(gene_start, wstart)
+          gene_end    <- pmin(gene_end,   wend)
+          exons_start <- pmax(exons_start, wstart)
+          exons_end   <- pmin(exons_end,   wend)
+        }
+        # "keep": leave extents untouched (genes may run past the window edge).
+
+        xpr <- pm$xplot_range %||% pm$xscale
+
+        # Packing intervals start from the (possibly clipped) body extent.
         p0 <- gene_start
         p1 <- gene_end
+        pad_bp <- numeric(length(gids))
+        # A1: in flush mode, widen each gene's packing interval on the label
+        # side by its rendered label width (converted to bp) plus label_pad, so
+        # genes whose *labels* collide are pushed to separate tiers. The body
+        # extents used for drawing (gene_start/gene_end) stay unpadded.
+        if (identical(self$label_position, "flush")) {
+          panel_w    <- pm$inner$x1 - pm$inner$x0
+          bp_per_npc <- if (isTRUE(panel_w > 0)) diff(xpr) / panel_w else 0
+          pad_bp     <- as.numeric(label_npc_w[gids]) * bp_per_npc + self$label_pad
+          is_minus   <- strand_g == "-"
+          # +/* genes draw their flush label on the left (5'); - on the right.
+          p0[!is_minus] <- p0[!is_minus] - pad_bp[!is_minus]
+          p1[ is_minus] <- p1[ is_minus] + pad_bp[ is_minus]
+        }
 
         tiers <- integer(length(gids))
         if (isTRUE(self$expanded)) {
-          tiers        <- as.integer(global_tier[gids])
-          ntiers_plus  <- exp_ntiers_plus
-          ntiers_minus <- exp_ntiers_minus
-          ntiers_flat  <- exp_ntiers
+          # A2: per-window ranking — one gene per tier, ordered by start (ties
+          # by label), over the genes present in THIS window only. A gene
+          # absent from a window does not reserve a row there.
+          if (use_sep_strands) {
+            for (st in c("+", "-")) {
+              sel <- which(strand_g == st)
+              if (!length(sel)) next
+              ordv <- sel[order(gene_start[sel], label_g[sel])]
+              tiers[ordv] <- seq_along(ordv)
+            }
+            ntiers_plus  <- max(1L, sum(strand_g == "+"))
+            ntiers_minus <- max(1L, sum(strand_g == "-"))
+            ntiers_flat  <- max(tiers)
+          } else {
+            ordv <- order(gene_start, label_g)
+            tiers[ordv]  <- seq_along(ordv)
+            ntiers_plus  <- length(gids)
+            ntiers_minus <- length(gids)
+            ntiers_flat  <- length(gids)
+          }
         } else if (use_sep_strands) {
           for (band_gids in list(gids[strand_g == "+"], gids[strand_g == "-"])) {
             if (length(band_gids) == 0) next
@@ -310,7 +430,6 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
           ntiers_flat  <- max(tiers)
         }
 
-        xpr <- pm$xplot_range %||% pm$xscale
         u0 <- (gene_start - xpr[1]) / diff(xpr)
         u1 <- (gene_end   - xpr[1]) / diff(xpr)
         x0c <- pm$inner$x0 + u0 * (pm$inner$x1 - pm$inner$x0)
@@ -335,7 +454,7 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
 
         win_ctx[[w]] <- list(
           pm = pm, xpr = xpr, gids = gids, strand_g = strand_g,
-          label_g = label_g, color_g = color_g, tiers = tiers,
+          label_g = label_g, color_g = color_g, tiers = tiers, pad_bp = pad_bp,
           ntiers_plus = ntiers_plus, ntiers_minus = ntiers_minus,
           ntiers_flat = ntiers_flat, x0c = x0c, x1c = x1c, tss_npc = tss_npc,
           gid_all = gid_all, type_all = type_all,
@@ -344,20 +463,17 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
       }
 
       # ── Global tier counts (constant row height across the track) ────────
+      # Always the max per-window tier count — including the `expanded` path
+      # (A2), which now ranks per window. Glyph height stays constant across
+      # windows while packing/rows are window-local.
       present <- Filter(Negate(is.null), win_ctx)
       if (length(present) == 0L) {
         self$coordCanvas <- data.frame()
         return(invisible())
       }
-      if (isTRUE(self$expanded)) {
-        ntiers_global       <- exp_ntiers
-        ntiers_plus_global  <- exp_ntiers_plus
-        ntiers_minus_global <- exp_ntiers_minus
-      } else {
-        ntiers_global       <- max(vapply(present, function(c) c$ntiers_flat,  integer(1)))
-        ntiers_plus_global  <- max(vapply(present, function(c) c$ntiers_plus,  integer(1)))
-        ntiers_minus_global <- max(vapply(present, function(c) c$ntiers_minus, integer(1)))
-      }
+      ntiers_global       <- max(vapply(present, function(c) c$ntiers_flat,  integer(1)))
+      ntiers_plus_global  <- max(vapply(present, function(c) c$ntiers_plus,  integer(1)))
+      ntiers_minus_global <- max(vapply(present, function(c) c$ntiers_minus, integer(1)))
 
       # Glyph vertical geometry for one gene, using the *global* tier count so
       # thickness is identical across windows. Honours pack_direction and,
@@ -404,6 +520,7 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
         label_g  <- ctx$label_g
         color_g  <- ctx$color_g
         tiers    <- ctx$tiers
+        pad_vec  <- ctx$pad_bp
         x0c      <- ctx$x0c
         x1c      <- ctx$x1c
         tss_npc  <- ctx$tss_npc
@@ -446,6 +563,7 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
           # Height computed in Pass 2 against the shared global row count.
           exon_h <- exon_h_vec[i]
           laby_i <- laby_vec[i]
+          pad_i  <- pad_vec[i]
 
           # ── style_type = "gene": one chevron polygon row per gene ───────
           if (self$style_type == "gene") {
@@ -472,6 +590,7 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
               use_sep_strands = use_sep_strands,
               label_pos       = lpos,
               label_y         = laby_i,
+              pad_bp          = pad_i,
               panel_y0        = pm$inner$y0,
               panel_y1        = pm$inner$y1,
               stringsAsFactors = FALSE,
@@ -500,6 +619,7 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
               use_sep_strands = use_sep_strands,
               label_pos       = lpos,
               label_y         = laby_i,
+              pad_bp          = pad_i,
               panel_y0        = pm$inner$y0,
               panel_y1        = pm$inner$y1,
               stringsAsFactors = FALSE,
@@ -535,6 +655,7 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
               use_sep_strands = use_sep_strands,
               label_pos       = lpos,
               label_y         = laby_i,
+              pad_bp          = pad_i,
               panel_y0        = pm$inner$y0,
               panel_y1        = pm$inner$y1,
               stringsAsFactors = FALSE,
@@ -573,6 +694,7 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
             use_sep_strands = use_sep_strands,
             label_pos       = lpos,
             label_y         = laby_i,
+            pad_bp          = pad_i,
             panel_y0        = pm$inner$y0,
             panel_y1        = pm$inner$y1,
             stringsAsFactors = FALSE,
@@ -604,6 +726,17 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
         x0b <- sub$x0b[1]
         x1b <- sub$x1b[1]
 
+        # Glyph border (exon boxes and the "gene" chevron). NA exon_lwd keeps
+        # the borderless default; a set exon_lwd strokes exon_border_col
+        # (falling back to the gene colour).
+        if (is.na(self$exon_lwd)) {
+          box_border <- NA; box_lwd <- 0.5
+        } else {
+          box_lwd    <- self$exon_lwd
+          box_border <- if (is.na(self$exon_border_col)) col
+                        else self$exon_border_col
+        }
+
         # ── style_type = "exon" (default): backbone + boxes + arrows ──────
         if (self$style_type == "exon") {
           # Backbone line — lty depends on backbone_type.
@@ -615,7 +748,8 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
           grid::grid.lines(
             x  = grid::unit(c(x0b, x1b), "npc"),
             y  = grid::unit(c(ym,  ym),  "npc"),
-            gp = grid::gpar(col = col, lwd = 1, lty = lty_val, lineend = "butt")
+            gp = grid::gpar(col = col, lwd = self$backbone_lwd,
+                            lty = lty_val, lineend = "butt")
           )
 
           # Chevron arrows only for backbone_type == "arrow".
@@ -632,13 +766,14 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
                 x1 = grid::unit(x, "npc"),
                 y0 = grid::unit(ym, "npc"),
                 y1 = grid::unit(ym, "npc"),
-                gp = grid::gpar(col = col, lwd = 1),
+                gp = grid::gpar(col = col, lwd = self$backbone_lwd),
                 arrow = grid::arrow(type = "open", angle = 45,
-                                    length = grid::unit(1.5, "mm"))
+                                    length = grid::unit(self$arrow_size, "mm"))
               )
             }
           }
 
+          # Exon/UTR boxes use the shared glyph border computed above.
           for (j in seq_len(nrow(sub))) {
             if (!isTRUE(sub$draw_box[j])) next
             grid::grid.rect(
@@ -646,7 +781,7 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
               y      = grid::unit((sub$exon_y0[j] + sub$exon_y1[j]) / 2, "npc"),
               width  = grid::unit(sub$exon_x1[j] - sub$exon_x0[j], "npc"),
               height = grid::unit(sub$exon_y1[j] - sub$exon_y0[j], "npc"),
-              gp     = grid::gpar(fill = col, col = NA)
+              gp     = grid::gpar(fill = col, col = box_border, lwd = box_lwd)
             )
           }
         }
@@ -671,7 +806,7 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
           grid::grid.polygon(
             x  = grid::unit(xs, "npc"),
             y  = grid::unit(ys, "npc"),
-            gp = grid::gpar(fill = col, col = NA)
+            gp = grid::gpar(fill = col, col = box_border, lwd = box_lwd)
           )
         }
 
@@ -689,35 +824,46 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
           }
         }
 
-        # TSS start-site flag: upward L-shaped open arrow.
-        # Skipped in "point" mode — the point itself marks the TSS.
+        # TSS start-site marker: up-then-over stem terminated by a solid
+        # filled triangle (a grid.polygon, not a grid arrow — grid's
+        # `type = "closed"` arrows render as an unfilled outline on many
+        # devices). Skipped in "point" mode. Strand-aware: `+` up-right,
+        # `-` up-left, with the triangle leading slightly ahead of the arm.
         if (isTRUE(self$show_start) && self$style_type != "point") {
-          tss_x   <- sub$tss_x[1]
-          # Use exon/gene box height when present; fall back when NA.
-          arrow_h <- (sub$exon_y1[1] - sub$exon_y0[1]) * 0.9
-          arrow_h <- if (is.finite(arrow_h) && arrow_h > 0) arrow_h else 0.02
-
-          stem_y0 <- ym
-          stem_y1 <- ym + arrow_h
+          tss_x <- sub$tss_x[1]
+          rise  <- self$tss_rise
+          if (is.null(rise)) {
+            rise <- (sub$exon_y1[1] - sub$exon_y0[1]) * 0.9
+            if (!(is.finite(rise) && rise > 0)) rise <- 0.02
+          }
+          run     <- self$tss_run
+          stem_y1 <- ym + rise
+          arm_end <- tss_x + dir * run
 
           # Vertical stem
           grid::grid.lines(
             x  = grid::unit(c(tss_x, tss_x), "npc"),
-            y  = grid::unit(c(stem_y0, stem_y1), "npc"),
-            gp = grid::gpar(col = col, lwd = 1.2)
+            y  = grid::unit(c(ym, stem_y1), "npc"),
+            gp = grid::gpar(col = col, lwd = self$tss_stem_lwd)
           )
-          # Horizontal arm with open arrowhead at the tip
-          flag_len <- 0.018
-          flag_x1  <- tss_x + dir * flag_len
+          # Horizontal arm
           grid::grid.segments(
-            x0 = grid::unit(tss_x,   "npc"),
-            x1 = grid::unit(flag_x1, "npc"),
-            y0 = grid::unit(stem_y1, "npc"),
-            y1 = grid::unit(stem_y1, "npc"),
-            gp = grid::gpar(col = col, lwd = 1.2),
-            arrow = grid::arrow(type = "closed", angle = 25,
-                                length = grid::unit(3, "mm"),
-                                ends   = "last")
+            x0 = grid::unit(tss_x,   "npc"), x1 = grid::unit(arm_end, "npc"),
+            y0 = grid::unit(stem_y1, "npc"), y1 = grid::unit(stem_y1, "npc"),
+            gp = grid::gpar(col = col, lwd = self$tss_stem_lwd)
+          )
+          # Solid filled triangle arrowhead, led slightly ahead of the arm.
+          tri_w <- grid::convertWidth(
+            grid::unit(self$tss_arrow_size, "mm"), "npc", valueOnly = TRUE)
+          tri_h <- grid::convertHeight(
+            grid::unit(self$tss_arrow_size, "mm"), "npc", valueOnly = TRUE)
+          base_x <- arm_end + dir * tri_w * 0.25   # small forward offset
+          apex_x <- base_x  + dir * tri_w
+          grid::grid.polygon(
+            x  = grid::unit(c(base_x, base_x, apex_x), "npc"),
+            y  = grid::unit(c(stem_y1 - tri_h / 2,
+                              stem_y1 + tri_h / 2, stem_y1), "npc"),
+            gp = grid::gpar(fill = col, col = col)
           )
         }
 
@@ -877,10 +1023,27 @@ SeqGeneR6 <- R6::R6Class("SeqGene",
 #'   downward. Tier *numbers* keep meaning packing order in both cases.
 #' @param expanded Logical. When `TRUE`, the greedy overlap packing is skipped
 #'   and every gene is given its own tier (one gene per row), ordered by
-#'   genomic start (ties broken by label). Tier assignment is consistent
-#'   across all windows in the track. Default `FALSE`.
-#' @param label_pad Numeric. Reserved for forward-compatibility; does not
-#'   currently affect tier packing. Default `50000`.
+#'   genomic start (ties broken by label). Ranking is per window (a gene absent
+#'   from a window does not reserve a row there); glyph height stays constant
+#'   across windows. Default `FALSE`.
+#' @param label_pad Numeric. In `label_position = "flush"`, extra bp padding
+#'   added beyond the measured rendered label width when packing tiers, so
+#'   genes whose labels would collide land on separate tiers. Default `50000`.
+#' @param backbone_lwd Numeric. Backbone (and chevron) line width. Default `1`.
+#' @param exon_lwd Numeric or `NA`. Exon/UTR box border width. `NA` (default)
+#'   draws unbordered boxes as before; a number strokes the border.
+#' @param exon_border_col Border colour used only when `exon_lwd` is set.
+#'   Default `NA` (falls back to the gene colour).
+#' @param arrow_size Numeric. Chevron arrowhead length in mm. Default `1.5`.
+#' @param tss_arrow_size Numeric. TSS marker triangle size in mm. Default `3`.
+#' @param tss_stem_lwd Numeric. TSS marker stem/arm line width. Default `1.2`.
+#' @param tss_rise Numeric or `NULL`. TSS stem rise in npc; `NULL` (default)
+#'   derives it from the gene box height.
+#' @param tss_run Numeric. TSS arm run in npc. Default `0.018`.
+#' @param oob Character. Out-of-bounds gene handling: `"truncate"` (default,
+#'   clip straddling genes to the window), `"keep"` (draw out-of-window
+#'   portions — the prior behaviour), or `"remove"` (drop any gene not entirely
+#'   within the window).
 #' @param ... Additional arguments reserved for future use.
 #' @return A `SeqGeneR6` instance.
 #' @examples
@@ -897,6 +1060,15 @@ seq_gene <- function(data = NULL, mapping = NULL, aesthetics = aes(),
                      pack_direction   = c("bottom_to_top", "top_to_bottom"),
                      expanded         = FALSE,
                      label_pad        = 50000,
+                     backbone_lwd     = 1,
+                     exon_lwd         = NA,
+                     exon_border_col  = NA,
+                     arrow_size       = 1.5,
+                     tss_arrow_size   = 3,
+                     tss_stem_lwd     = 1.2,
+                     tss_rise         = NULL,
+                     tss_run          = 0.018,
+                     oob              = c("truncate", "keep", "remove"),
                      ...) {
   SeqGeneR6$new(
     data             = data,
@@ -912,6 +1084,15 @@ seq_gene <- function(data = NULL, mapping = NULL, aesthetics = aes(),
     pack_direction   = pack_direction,
     expanded         = expanded,
     label_pad        = label_pad,
+    backbone_lwd     = backbone_lwd,
+    exon_lwd         = exon_lwd,
+    exon_border_col  = exon_border_col,
+    arrow_size       = arrow_size,
+    tss_arrow_size   = tss_arrow_size,
+    tss_stem_lwd     = tss_stem_lwd,
+    tss_rise         = tss_rise,
+    tss_run          = tss_run,
+    oob              = oob,
     ...
   )
 }

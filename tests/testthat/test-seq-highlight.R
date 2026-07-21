@@ -155,3 +155,36 @@ test_that("seq_highlight projects to different widths when track scales differ",
   # so the same 100bp region should be ~5x wider in B than in A.
   expect_gt(width_b, width_a * 3)
 })
+
+# ── Single-polygon draw (one stroked path per disjoint piece) ─────────────────
+
+# Count polygon grobs produced by draw() on a fresh page.
+hl_count_polygons <- function(lnk) {
+  grid::grid.newpage()
+  grid::pushViewport(grid::viewport())
+  lnk$draw()
+  g <- grid::grid.ls(print = FALSE)
+  sum(grepl("polygon", g$name, ignore.case = TRUE))
+}
+
+test_that("a contiguous multi-track highlight strokes exactly one path", {
+  tl  <- hl_make_three_track_layout()
+  gr  <- GRanges("chr1", IRanges(300, 400))          # single region
+  lnk <- seq_highlight(data = gr, map(x0 = start, x0_end = end),
+                       t0 = "A", t1 = "C",
+                       aesthetics = aes(color = "black", fill = "grey50"))
+  lnk$prep(hl_named_layout(tl), hl_named_windows(tl))
+  grDevices::pdf(NULL); on.exit(grDevices::dev.off())
+  expect_equal(hl_count_polygons(lnk), 1L)
+})
+
+test_that("a multi-region highlight strokes one path per disjoint region", {
+  tl  <- hl_make_two_track_layout()
+  gr  <- GRanges("chr1", IRanges(c(150, 700), width = 80))  # two regions
+  lnk <- seq_highlight(data = gr, map(x0 = start, x0_end = end),
+                       t0 = "A", t1 = "B",
+                       aesthetics = aes(color = "black", fill = "grey50"))
+  lnk$prep(hl_named_layout(tl), hl_named_windows(tl))
+  grDevices::pdf(NULL); on.exit(grDevices::dev.off())
+  expect_equal(hl_count_polygons(lnk), 2L)
+})

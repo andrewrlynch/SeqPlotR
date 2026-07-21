@@ -642,6 +642,32 @@ seq_plot() %|%
 p$plot()
 ```
 
+With `expanded = TRUE` the tiering is computed **per window**, so a gene that
+is absent from a window does not reserve an empty row there; glyph height still
+stays constant across windows. In the default `label_position = "flush"` mode,
+packing also accounts for the rendered label width (plus `label_pad`), so genes
+whose labels would overlap are pushed onto separate tiers.
+
+### Borders, line widths, and out-of-bounds genes
+
+The gene glyphs expose their stroke widths: `backbone_lwd` (backbone and
+chevron arrows), `arrow_size` (chevron head, mm), and `exon_lwd` /
+`exon_border_col` for exon/UTR box borders (unset by default). The TSS marker
+drawn by `show_start = TRUE` is a solid filled triangle whose size and stem are
+tunable via `tss_arrow_size`, `tss_stem_lwd`, `tss_rise`, and `tss_run`.
+
+Genes that straddle a window edge are handled by `oob`, which now defaults to
+`"truncate"` (clip the gene to the window). Use `oob = "keep"` to draw the
+out-of-window portions (the previous default) or `oob = "remove"` to drop any
+gene not entirely within the window.
+
+```{r gene-oob, eval = FALSE}
+seq_gene(map(group = gene_id, strand = strand_col, label = gene_name,
+             type = feat_type),
+         exon_lwd = 0.8, exon_border_col = "grey20",
+         show_start = TRUE, oob = "truncate")
+```
+
 ## `seq_sequence` — IGV-style nucleotide display
 
 `seq_sequence()` renders a coloured rectangle for each nucleotide in

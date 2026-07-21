@@ -22,9 +22,9 @@ Internal R6 generator backing \code{\link[=seq_gene]{seq_gene()}}. Inherits from
 \item{\code{exon_height}}{Proportion of per-tier height allocated to the
 exon box.}
 
-\item{\code{label_pad}}{Reserved. Padding (in bp) once used to keep flush
-labels from overlapping neighbouring genes. Exposed for
-forward-compatibility; it does \strong{not} currently affect tier packing.}
+\item{\code{label_pad}}{Extra padding (in bp) added, on top of the measured
+rendered label width, to each gene's packing interval on the label
+side. Only affects \code{label_position = "flush"}. Default \code{50000}.}
 
 \item{\code{label_position}}{Character. One of \code{"flush"}, \code{"above"}, \code{"below"}.
 Controls where the gene label is drawn. Default \code{"flush"}.}
@@ -67,6 +67,35 @@ Selects the per-gene rendering style: \code{"exon"} draws backbone +
 exon/UTR boxes (default); \code{"gene"} draws a single chevron-shaped
 polygon spanning the full gene extent; \code{"point"} draws a single
 filled circle at the TSS. Default \code{"exon"}.}
+
+\item{\code{backbone_lwd}}{Numeric. Backbone line width; also the default
+stroke width of the directional chevron arrows. Default \code{1}.}
+
+\item{\code{exon_lwd}}{Numeric or \code{NA}. Exon/UTR box border width. When \code{NA}
+(default) boxes draw with no border (\code{col = NA}, current behaviour);
+when set, the border is stroked.}
+
+\item{\code{exon_border_col}}{Border colour for exon/UTR boxes, used only when
+\code{exon_lwd} is not \code{NA}. Default \code{NA} (inherits the gene colour).}
+
+\item{\code{arrow_size}}{Numeric. Chevron arrowhead length in millimetres.
+Default \code{1.5}.}
+
+\item{\code{tss_arrow_size}}{Numeric. TSS marker arrowhead (filled triangle)
+size in millimetres. Default \code{3}.}
+
+\item{\code{tss_stem_lwd}}{Numeric. Line width of the TSS marker stem/arm.
+Default \code{1.2}.}
+
+\item{\code{tss_rise}}{Numeric or \code{NULL}. Vertical stem rise of the TSS marker
+in npc. When \code{NULL} (default) it is derived from the gene box height
+(\verb{0.9 *} box height, \code{0.02} fallback), matching prior behaviour.}
+
+\item{\code{tss_run}}{Numeric. Horizontal arm run of the TSS marker in npc.
+Default \code{0.018}.}
+
+\item{\code{oob}}{Character. Out-of-bounds handling for genes straddling a
+window edge: \code{"keep"}, \code{"truncate"} (default), or \code{"remove"}.}
 }
 \if{html}{\out{</div>}}
 }
@@ -108,6 +137,15 @@ Construct a SeqGeneR6.
   pack_direction = c("bottom_to_top", "top_to_bottom"),
   expanded = FALSE,
   label_pad = 50000,
+  backbone_lwd = 1,
+  exon_lwd = NA,
+  exon_border_col = NA,
+  arrow_size = 1.5,
+  tss_arrow_size = 3,
+  tss_stem_lwd = 1.2,
+  tss_rise = NULL,
+  tss_run = 0.018,
+  oob = c("truncate", "keep", "remove"),
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -152,8 +190,29 @@ reserved for \code{"above"}/\code{"below"} labels. Default \code{0.35}.}
 \item{\code{expanded}}{Logical. When \code{TRUE}, one gene per tier regardless of
 overlap, consistent across all windows. Default \code{FALSE}.}
 
-\item{\code{label_pad}}{Numeric. Reserved; does not currently affect packing.
-Default \code{50000}.}
+\item{\code{label_pad}}{Numeric. Extra bp padding beyond the measured label
+width, applied on the label side in \code{"flush"} mode. Default \code{50000}.}
+
+\item{\code{backbone_lwd}}{Numeric. Backbone (and chevron) line width. Default \code{1}.}
+
+\item{\code{exon_lwd}}{Numeric or \code{NA}. Exon/UTR box border width. Default \code{NA}.}
+
+\item{\code{exon_border_col}}{Exon/UTR border colour when \code{exon_lwd} is set.
+Default \code{NA} (inherits gene colour).}
+
+\item{\code{arrow_size}}{Numeric. Chevron arrowhead length (mm). Default \code{1.5}.}
+
+\item{\code{tss_arrow_size}}{Numeric. TSS triangle size (mm). Default \code{3}.}
+
+\item{\code{tss_stem_lwd}}{Numeric. TSS stem/arm line width. Default \code{1.2}.}
+
+\item{\code{tss_rise}}{Numeric or \code{NULL}. TSS stem rise (npc); \code{NULL} derives it
+from box height. Default \code{NULL}.}
+
+\item{\code{tss_run}}{Numeric. TSS arm run (npc). Default \code{0.018}.}
+
+\item{\code{oob}}{Character. Out-of-bounds gene handling: \code{"keep"},
+\code{"truncate"} (default), or \code{"remove"}.}
 
 \item{\code{...}}{Unused.}
 }

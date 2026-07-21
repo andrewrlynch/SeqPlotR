@@ -463,7 +463,11 @@
 .build_positional_layout <- function(rows, aesthetics) {
   margins    <- aesthetics$margins %||% list(top = 0, right = 0,
                                              bottom = 0, left = 0)
-  trackGap   <- aesthetics$track_gaps  %||% 0.01
+  # Canonical dotted key `track.gap.width` wins; `track_gaps` is the
+  # deprecated alias; 0.01 is the historical default. Mirrors the
+  # `window.gap.width` / `window_gaps` resolution below.
+  trackGap   <- aesthetics[["track.gap.width"]] %||%
+                aesthetics$track_gaps            %||% 0.01
   windowGap  <- aesthetics[["window.gap.width"]] %||%
                 aesthetics$window_gaps           %||% 0.01
 
