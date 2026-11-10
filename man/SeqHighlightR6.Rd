@@ -138,9 +138,11 @@ Project each highlight region onto every track in
 \if{html}{\out{<a id="method-SeqHighlight-draw"></a>}}
 \if{latex}{\out{\hypertarget{method-SeqHighlight-draw}{}}}
 \subsection{Method \code{draw()}}{
-Render the highlight band: one filled rectangle per
-per-track / per-window slice, and a connecting trapezoid in the
-gap between adjacent tracks (matched by \code{window_idx}).
+Render the highlight band. For each region, the union of
+its per-track rectangles and the bridging trapezoids between adjacent
+tracks is traced as a \emph{single} closed polygon (one outer boundary) so
+fill and border stroke apply once, with no internal seams. A region
+that is disjoint across windows produces one polygon per piece.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{SeqHighlightR6$draw()}\if{html}{\out{</div>}}
 }

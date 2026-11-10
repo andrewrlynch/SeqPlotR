@@ -194,6 +194,20 @@ p <- seq_plot() %+%
 p
 ```
 
+Ticks and labels track the axis's resolved `position`, so they always sit on
+the correct side after a `position` override. To flip them to the opposite
+(panel-facing) side of the axis line without moving the line itself, set
+`axis.<side>.ticks.direction = "in"`. It defaults to `"out"` and inherits
+through the usual `axis.x1 -> axis.x -> axis` chain.
+
+```{r ticks-direction, fig.height = 3}
+p <- seq_plot() %+%
+  seq_track(data = d, windows = win,
+            aesthetics = aes(axis.x1.ticks.direction = "in")) %+%
+  seq_point(map(x = start, y = score))
+p
+```
+
 ## 5. Track and window chrome
 
 The `track.*` namespace controls the rectangle shared by all windows;

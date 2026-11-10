@@ -602,6 +602,77 @@ seq_plot() %|%
 p$plot()
 ```
 
+### Packing controls — `expanded`, `pack_direction`, `label_position`
+
+By default `seq_gene` packs genes into the fewest non-overlapping tiers and
+draws tier 1 at the bottom of the track. Three arguments override this:
+
+- `expanded = TRUE` gives **every gene its own row**, ordered by genomic
+  start, regardless of overlap. Row assignment is consistent across all
+  windows in the track, so a gene keeps the same relative row wherever it
+  appears.
+- `pack_direction = "top_to_bottom"` draws tier 1 at the **top** and stacks
+  downward (tier numbers still mean packing order).
+- `label_position = "above"` / `"below"` centres each gene's label over its
+  body instead of flush against the 5'/3' end; `label_row_frac` (default
+  `0.35`) sets how much of each row is reserved for the label text.
+
+Glyph thickness is now constant across every window in a track — a sparse
+window renders genes at the same height as a dense one and simply leaves the
+unused rows empty.
+
+```{r gene-expanded, fig.height = 4}
+seq_plot() %|%
+  seq_track(data = dense_gr,
+            mapping = map(group  = gene_id,
+                          type   = feature,
+                          strand = strand_col,
+                          label  = gene_name,
+                          color  = color),
+            windows = win,
+            track_height = 1.6) %+%
+  seq_gene(map(group  = gene_id,
+               type   = feature,
+               strand = strand_col,
+               label  = gene_name,
+               color  = color),
+           expanded       = TRUE,
+           pack_direction = "top_to_bottom",
+           label_position = "above") -> p
+p$plot()
+```
+
+With `expanded = TRUE` the tiering is computed **per window**, so a gene that
+is absent from a window does not reserve an empty row there; glyph height still
+stays constant across windows. In the default `label_position = "flush"` mode,
+packing also accounts for the rendered label width (plus `label_pad`), so genes
+whose labels would overlap are pushed onto separate tiers.
+
+### Borders, line widths, and out-of-bounds genes
+
+The gene glyphs expose their stroke widths: `backbone_lwd` (backbone and
+chevron arrows), `arrow_size` (chevron head, mm), and `exon_lwd` /
+`exon_border_col` for exon/UTR box borders (unset by default). The TSS marker
+drawn by `show_start = TRUE` is a solid filled triangle whose size and stem are
+tunable via `tss_arrow_size`, `tss_stem_lwd`, `tss_rise`, and `tss_run`.
+
+Genes that straddle a window edge are handled by `oob`, which now defaults to
+`"truncate"` (clip the gene to the window). Use `oob = "keep"` to draw the
+out-of-window portions (the previous default) or `oob = "remove"` to drop any
+gene not entirely within the window.
+
+Vertical spacing between gene rows is controlled by `exon_height` (the fraction
+of each tier row the glyph fills, default `0.8`). Lower it to spread crowded
+genes apart; for very dense tracks, combine it with a larger `track_height`.
+
+```{r gene-oob, eval = FALSE}
+seq_gene(map(group = gene_id, strand = strand_col, label = gene_name,
+             type = feat_type),
+         exon_lwd = 0.8, exon_border_col = "grey20",
+         exon_height = 0.6,        # more padding between rows
+         show_start = TRUE, oob = "truncate")
+```
+
 ## `seq_sequence` — IGV-style nucleotide display
 
 `seq_sequence()` renders a coloured rectangle for each nucleotide in

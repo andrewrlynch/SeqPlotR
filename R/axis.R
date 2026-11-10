@@ -58,9 +58,15 @@
 #' trims whitespace. A separate helper so the axis draw code reads clean.
 #'
 #' @param x Numeric vector of tick values.
+#' @param digits Optional integer. When non-NULL, values are rounded to and
+#'   shown with exactly this many decimal places; otherwise adaptive default
+#'   formatting is used.
 #' @return Character vector of formatted labels.
 #' @keywords internal
-.axis_fmt <- function(x) {
+.axis_fmt <- function(x, digits = NULL) {
+  if (!is.null(digits))
+    return(format(round(x, digits), big.mark = ",", scientific = FALSE,
+                  trim = TRUE, nsmall = digits))
   format(x, big.mark = ",", scientific = FALSE, trim = TRUE)
 }
 
@@ -205,8 +211,11 @@
     base$inner$x0 + (v - base$xscale[1]) / span *
       (base$inner$x1 - base$inner$x0)
   }
-  # Default scale factor: Mb when scale type is genomic, else 1.
+  # Scale factor: inherit the base panel's (which layout already set from a
+  # user `unit`, if any) so a manual unit is honoured here too; fall back to
+  # Mb for genomic scales, else 1.
   default_sf <- if (identical(base$x_scale_type, "genomic")) 1e-6 else 1
+  sf <- base$xScaleFactor %||% default_sf
 
   lapply(seq_along(vmap$seqnames), function(k) {
     win <- base
@@ -214,7 +223,7 @@
     win$data_x  <- win$xscale
     win$inner$x0 <- to_npc_x(vmap$virtual_start[k])
     win$inner$x1 <- to_npc_x(vmap$virtual_end[k])
-    win$xScaleFactor <- default_sf
+    win$xScaleFactor <- sf
     win$.combined_window_label <- paste0(
       vmap$seqnames[k], ": ",
       format(vmap$genomic_start[k], big.mark = ",", scientific = FALSE), "-",
@@ -243,7 +252,10 @@
 .expand_panels_for_multi_y_axis <- function(panels) {
   if (length(panels) == 0L) return(panels)
   base <- panels[[1]]
+  # Inherit the base panel's y factor (layout sets it from a user `unit` when
+  # present) so a manual unit is honoured; fall back to Mb / 1 otherwise.
   default_sf <- if (identical(base$y_scale_type, "genomic")) 1e-6 else 1
+  sf <- base$yScaleFactor %||% default_sf
 
   y_subs <- base$y_sub_panels
   if (!is.null(y_subs) && length(y_subs) > 0L) {
@@ -254,7 +266,7 @@
       p$data_y <- sub$yscale
       p$inner$y0 <- sub$y0
       p$inner$y1 <- sub$y1
-      p$yScaleFactor <- default_sf
+      p$yScaleFactor <- sf
       p$.combined_window_label <- paste0(
         sub$seqname, ": ",
         format(sub$yscale[1], big.mark = ",", scientific = FALSE), "-",
@@ -276,7 +288,7 @@
       p$data_y <- p$yscale
       p$inner$y0 <- to_npc_y(vmap$virtual_start[k])
       p$inner$y1 <- to_npc_y(vmap$virtual_end[k])
-      p$yScaleFactor <- default_sf
+      p$yScaleFactor <- sf
       p$.combined_window_label <- paste0(
         vmap$seqnames[k], ": ",
         format(vmap$genomic_start[k], big.mark = ",", scientific = FALSE), "-",
@@ -286,6 +298,50 @@
   }
 
   panels
+}
+
+# ── Tick / label direction ───────────────────────────────────────────────────
+
+#' Sign of the tick/label offset for an axis
+#'
+#' Direction is derived from the axis's resolved *position* (never its
+#' `x1`/`x2`/`y1`/`y2` identifier) plus an explicit `"out"`/`"in"` mode.
+#' `"out"` (default) points ticks and labels away from the panel; `"in"`
+#' flips them toward the panel. A negative sign moves toward smaller npc
+#' (down for x, left for y); positive moves toward larger npc.
+#'
+#' @param axis_pos One of `"bottom"`, `"top"`, `"left"`, `"right"`.
+#' @param dir_mode `"out"` (default) or `"in"`.
+#' @return `-1` or `1`.
+#' @keywords internal
+.axis_tick_dir <- function(axis_pos, dir_mode = "out") {
+  base <- switch(axis_pos, bottom = -1, top = 1, left = -1, right = 1, -1)
+  if (identical(dir_mode, "in")) -base else base
+}
+
+#' Text justification that tracks the tick/label direction
+#'
+#' Returns the anchor justification so a label sits on the outward (or,
+#' when `dir_mode == "in"`, inward) side of the axis line. For x axes the
+#' vertical component (`v`) carries the direction and the horizontal
+#' component is `"center"`; for y axes the horizontal component (`h`)
+#' carries it and the vertical component is `"center"`.
+#'
+#' @param axis_pos One of `"bottom"`, `"top"`, `"left"`, `"right"`.
+#' @param dir_mode `"out"` (default) or `"in"`.
+#' @return A list with `h` and `v` justification strings.
+#' @keywords internal
+.axis_label_just <- function(axis_pos, dir_mode = "out") {
+  outward <- !identical(dir_mode, "in")
+  if (axis_pos %in% c("bottom", "top")) {
+    # Outward-below (bottom) anchors the label by its top edge.
+    v <- if ((axis_pos == "bottom") == outward) "top" else "bottom"
+    list(h = "center", v = v)
+  } else {
+    # Outward-left (left) anchors the label by its right edge.
+    h <- if ((axis_pos == "left") == outward) "right" else "left"
+    list(h = h, v = "center")
+  }
 }
 
 # ── One-axis draw ────────────────────────────────────────────────────────────
@@ -328,10 +384,15 @@
                 (length(panels) > 1L &&
                  !is.null(panels[[1]]$.combined_window_label))
 
-  tick_dir <- if (side == "x1")        -1
-              else if (side == "x2")    1
-              else if (side == "y1")   -1
-              else                      1
+  # Direction is derived from the axis's resolved *position*, not its
+  # identifier, so overriding e.g. axis.x1.position = "top" correctly moves
+  # ticks/labels with the line. axis.<side>.ticks.direction ("out"/"in")
+  # then flips the sense toward or away from the panel.
+  axis_pos <- spec$position %||%
+    switch(side, x1 = "bottom", x2 = "top", y1 = "left", y2 = "right")
+  dir_mode <- spec$ticks$direction %||% "out"
+  tick_dir <- .axis_tick_dir(axis_pos, dir_mode)
+  label_just <- .axis_label_just(axis_pos, dir_mode)
 
   # Unit label setup — only active for genomic axes with an explicit unit.
   unit_str       <- NULL
@@ -420,7 +481,8 @@
       lo_val <- scale_lim[1] * sf
       hi_val <- scale_lim[2] * sf
       range_label <- sprintf("[%s\u2013%s]",
-                             .axis_fmt(lo_val), .axis_fmt(hi_val))
+                             .axis_fmt(lo_val, scale$digits),
+                             .axis_fmt(hi_val, scale$digits))
 
       offset <- spec$text$offset %||% (if (is_x) 0.015 else 0.010)
 
@@ -510,7 +572,7 @@
             } else {
               if (identical(scale$type, "genomic")) (win$yScaleFactor %||% 1e-6) else 1
             }
-            lbl <- .axis_fmt(as.numeric(lbl) * scaleF)
+            lbl <- .axis_fmt(as.numeric(lbl) * scaleF, scale$digits)
             if (!is.null(unit_str)) {
               add_unit <- switch(ul_mode,
                 all            = TRUE,
@@ -527,22 +589,20 @@
           gp_text <- grid::gpar(col = spec$text$col %||% "#1C1B1A",
                                 cex = spec$text$size %||% 0.6)
           if (is_x) {
-            just_v <- if (side == "x1") "top" else "bottom"
             grid::grid.text(
               label = lbl,
               x = grid::unit(pos, "npc"),
               y = grid::unit(anchor + tick_dir * offset, "npc"),
-              just = c("center", just_v),
+              just = c(label_just$h, label_just$v),
               rot  = spec$text$angle %||% 0,
               gp   = gp_text
             )
           } else {
-            just_h <- if (side == "y1") "right" else "left"
             grid::grid.text(
               label = lbl,
               x = grid::unit(anchor + tick_dir * offset, "npc"),
               y = grid::unit(pos, "npc"),
-              just = c(just_h, "center"),
+              just = c(label_just$h, label_just$v),
               rot  = spec$text$angle %||% 0,
               gp   = gp_text
             )

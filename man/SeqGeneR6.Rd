@@ -22,8 +22,24 @@ Internal R6 generator backing \code{\link[=seq_gene]{seq_gene()}}. Inherits from
 \item{\code{exon_height}}{Proportion of per-tier height allocated to the
 exon box.}
 
-\item{\code{label_pad}}{Minimum padding (in bp) around each gene's extent to
-keep labels from overlapping neighbouring genes.}
+\item{\code{label_pad}}{Extra padding (in bp) added, on top of the measured
+rendered label width, to each gene's packing interval on the label
+side. Only affects \code{label_position = "flush"}. Default \code{50000}.}
+
+\item{\code{label_position}}{Character. One of \code{"flush"}, \code{"above"}, \code{"below"}.
+Controls where the gene label is drawn. Default \code{"flush"}.}
+
+\item{\code{label_row_frac}}{Numeric in \verb{[0, 1)}. Fraction of each tier row
+reserved for the label when \code{label_position} is \code{"above"}/\code{"below"};
+the exon/gene glyph height is shrunk accordingly. Default \code{0.35}.}
+
+\item{\code{pack_direction}}{Character. One of \code{"bottom_to_top"},
+\code{"top_to_bottom"}. Physical edge tier 1 is drawn from. Default
+\code{"bottom_to_top"}.}
+
+\item{\code{expanded}}{Logical. When \code{TRUE}, every gene gets its own tier
+(one gene per row) regardless of genomic overlap, consistently across
+all windows in the track. Default \code{FALSE}.}
 
 \item{\code{label_cex}}{Expansion factor for gene label text.}
 
@@ -51,6 +67,35 @@ Selects the per-gene rendering style: \code{"exon"} draws backbone +
 exon/UTR boxes (default); \code{"gene"} draws a single chevron-shaped
 polygon spanning the full gene extent; \code{"point"} draws a single
 filled circle at the TSS. Default \code{"exon"}.}
+
+\item{\code{backbone_lwd}}{Numeric. Backbone line width; also the default
+stroke width of the directional chevron arrows. Default \code{1}.}
+
+\item{\code{exon_lwd}}{Numeric or \code{NA}. Exon/UTR box border width. When \code{NA}
+(default) boxes draw with no border (\code{col = NA}, current behaviour);
+when set, the border is stroked.}
+
+\item{\code{exon_border_col}}{Border colour for exon/UTR boxes, used only when
+\code{exon_lwd} is not \code{NA}. Default \code{NA} (inherits the gene colour).}
+
+\item{\code{arrow_size}}{Numeric. Chevron arrowhead length in millimetres.
+Default \code{1.5}.}
+
+\item{\code{tss_arrow_size}}{Numeric. TSS marker arrowhead (filled triangle)
+size in millimetres. Default \code{3}.}
+
+\item{\code{tss_stem_lwd}}{Numeric. Line width of the TSS marker stem/arm.
+Default \code{1.2}.}
+
+\item{\code{tss_rise}}{Numeric or \code{NULL}. Vertical stem rise of the TSS marker
+in npc. When \code{NULL} (default) it is derived from the gene box height
+(\verb{0.9 *} box height, \code{0.02} fallback), matching prior behaviour.}
+
+\item{\code{tss_run}}{Numeric. Horizontal arm run of the TSS marker in npc.
+Default \code{0.018}.}
+
+\item{\code{oob}}{Character. Out-of-bounds handling for genes straddling a
+window edge: \code{"keep"}, \code{"truncate"} (default), or \code{"remove"}.}
 }
 \if{html}{\out{</div>}}
 }
@@ -87,6 +132,21 @@ Construct a SeqGeneR6.
   tss_position = NULL,
   separate_strands = FALSE,
   style_type = c("exon", "gene", "point"),
+  label_position = c("flush", "above", "below"),
+  label_row_frac = 0.35,
+  pack_direction = c("bottom_to_top", "top_to_bottom"),
+  expanded = FALSE,
+  label_pad = 50000,
+  exon_height = 0.8,
+  backbone_lwd = 1,
+  exon_lwd = NA,
+  exon_border_col = NA,
+  arrow_size = 1.5,
+  tss_arrow_size = 3,
+  tss_stem_lwd = 1.2,
+  tss_rise = NULL,
+  tss_run = 0.018,
+  oob = c("truncate", "keep", "remove"),
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -118,6 +178,46 @@ sub-bands. Default \code{FALSE}.}
 \item{\code{style_type}}{Character. One of \code{"exon"} (default), \code{"gene"}, or
 \code{"point"}. Controls per-gene rendering: full backbone + exon boxes,
 single chevron polygon, or a single TSS point.}
+
+\item{\code{label_position}}{Character. One of \code{"flush"} (default), \code{"above"},
+\code{"below"}. Where the gene label is drawn.}
+
+\item{\code{label_row_frac}}{Numeric in \verb{[0, 1)}. Fraction of each tier row
+reserved for \code{"above"}/\code{"below"} labels. Default \code{0.35}.}
+
+\item{\code{pack_direction}}{Character. One of \code{"bottom_to_top"} (default) or
+\code{"top_to_bottom"}. Physical edge tier 1 is drawn from.}
+
+\item{\code{expanded}}{Logical. When \code{TRUE}, one gene per tier regardless of
+overlap, consistent across all windows. Default \code{FALSE}.}
+
+\item{\code{label_pad}}{Numeric. Extra bp padding beyond the measured label
+width, applied on the label side in \code{"flush"} mode. Default \code{50000}.}
+
+\item{\code{exon_height}}{Numeric in \verb{(0, 1]}. Fraction of each tier row the gene
+glyph fills; the remainder is vertical padding between rows. Lower it to
+space genes further apart. Default \code{0.8}.}
+
+\item{\code{backbone_lwd}}{Numeric. Backbone (and chevron) line width. Default \code{1}.}
+
+\item{\code{exon_lwd}}{Numeric or \code{NA}. Exon/UTR box border width. Default \code{NA}.}
+
+\item{\code{exon_border_col}}{Exon/UTR border colour when \code{exon_lwd} is set.
+Default \code{NA} (inherits gene colour).}
+
+\item{\code{arrow_size}}{Numeric. Chevron arrowhead length (mm). Default \code{1.5}.}
+
+\item{\code{tss_arrow_size}}{Numeric. TSS triangle size (mm). Default \code{3}.}
+
+\item{\code{tss_stem_lwd}}{Numeric. TSS stem/arm line width. Default \code{1.2}.}
+
+\item{\code{tss_rise}}{Numeric or \code{NULL}. TSS stem rise (npc); \code{NULL} derives it
+from box height. Default \code{NULL}.}
+
+\item{\code{tss_run}}{Numeric. TSS arm run (npc). Default \code{0.018}.}
+
+\item{\code{oob}}{Character. Out-of-bounds gene handling: \code{"keep"},
+\code{"truncate"} (default), or \code{"remove"}.}
 
 \item{\code{...}}{Unused.}
 }

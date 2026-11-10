@@ -233,6 +233,7 @@
     "axis.ticks.lwd"           = 1,
     "axis.ticks.length"        = 0.005,
     "axis.ticks.visible"       = TRUE,
+    "axis.ticks.direction"     = "out",
     "axis.text.size"           = 0.6,
     "axis.text.col"            = "#1C1B1A",
     "axis.text.angle"          = 0,
@@ -330,11 +331,14 @@
       visible = .get("line.visible", TRUE)
     ),
     ticks = list(
-      col     = .get("ticks.col", .get("line.col", "#1C1B1A")),
-      lwd     = .get("ticks.lwd", .get("line.lwd", 1)),
-      length  = .get("ticks.length", 0.005),
-      alpha   = .get("ticks.alpha", 1),
-      visible = .get("ticks.visible", TRUE)
+      col       = .get("ticks.col", .get("line.col", "#1C1B1A")),
+      lwd       = .get("ticks.lwd", .get("line.lwd", 1)),
+      length    = .get("ticks.length", 0.005),
+      alpha     = .get("ticks.alpha", 1),
+      visible   = .get("ticks.visible", TRUE),
+      # "out" (default) points ticks/labels away from the panel; "in" flips
+      # them toward the panel. Resolved off the same axis.* inheritance chain.
+      direction = .get("ticks.direction", "out")
     ),
     text = list(
       size     = .get("text.size", 0.6),

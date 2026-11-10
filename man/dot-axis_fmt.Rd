@@ -4,10 +4,14 @@
 \alias{.axis_fmt}
 \title{Format a numeric tick label}
 \usage{
-.axis_fmt(x)
+.axis_fmt(x, digits = NULL)
 }
 \arguments{
 \item{x}{Numeric vector of tick values.}
+
+\item{digits}{Optional integer. When non-NULL, values are rounded to and
+shown with exactly this many decimal places; otherwise adaptive default
+formatting is used.}
 }
 \value{
 Character vector of formatted labels.

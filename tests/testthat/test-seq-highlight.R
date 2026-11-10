@@ -155,3 +155,69 @@ test_that("seq_highlight projects to different widths when track scales differ",
   # so the same 100bp region should be ~5x wider in B than in A.
   expect_gt(width_b, width_a * 3)
 })
+
+# ── Single-polygon draw (one stroked path per disjoint piece) ─────────────────
+
+# Count polygon grobs produced by draw() on a fresh page.
+hl_count_polygons <- function(lnk) {
+  grid::grid.newpage()
+  grid::pushViewport(grid::viewport())
+  lnk$draw()
+  g <- grid::grid.ls(print = FALSE)
+  sum(grepl("polygon", g$name, ignore.case = TRUE))
+}
+
+test_that("a contiguous multi-track highlight strokes exactly one path", {
+  tl  <- hl_make_three_track_layout()
+  gr  <- GRanges("chr1", IRanges(300, 400))          # single region
+  lnk <- seq_highlight(data = gr, map(x0 = start, x0_end = end),
+                       t0 = "A", t1 = "C",
+                       aesthetics = aes(color = "black", fill = "grey50"))
+  lnk$prep(hl_named_layout(tl), hl_named_windows(tl))
+  grDevices::pdf(NULL); on.exit(grDevices::dev.off())
+  expect_equal(hl_count_polygons(lnk), 1L)
+})
+
+test_that("a multi-region highlight strokes one path per disjoint region", {
+  tl  <- hl_make_two_track_layout()
+  gr  <- GRanges("chr1", IRanges(c(150, 700), width = 80))  # two regions
+  lnk <- seq_highlight(data = gr, map(x0 = start, x0_end = end),
+                       t0 = "A", t1 = "B",
+                       aesthetics = aes(color = "black", fill = "grey50"))
+  lnk$prep(hl_named_layout(tl), hl_named_windows(tl))
+  grDevices::pdf(NULL); on.exit(grDevices::dev.off())
+  expect_equal(hl_count_polygons(lnk), 2L)
+})
+
+test_that("region connects across tracks with different window layouts (batch 3)", {
+  # Regression: overview (t0) with the region in a non-first window and a
+  # zoom track (t1) with it in window 1 must draw ONE connected ribbon, not
+  # two disconnected rectangles.
+  lnk <- seq_highlight(t0 = 1, t1 = 2,
+                       aesthetics = aes(color = "black", fill = "grey50"))
+  lnk$coordCanvas <- data.frame(
+    region_id  = c(1, 1),
+    track_pos  = c(1, 2),
+    window_idx = c(2, 1),          # different window_idx per track
+    xL = c(0.30, 0.28), xR = c(0.60, 0.62),
+    y0_npc = c(0.6, 0.1), y1_npc = c(0.9, 0.4),
+    stringsAsFactors = FALSE
+  )
+  grDevices::pdf(NULL); on.exit(grDevices::dev.off())
+  expect_equal(hl_count_polygons(lnk), 1L)
+})
+
+test_that("multi-window-within-a-track region still splits into pieces (batch 3)", {
+  lnk <- seq_highlight(t0 = 1, t1 = 2,
+                       aesthetics = aes(color = "black", fill = "grey50"))
+  lnk$coordCanvas <- data.frame(
+    region_id  = c(1, 1, 1, 1),
+    track_pos  = c(1, 2, 1, 2),
+    window_idx = c(1, 1, 2, 2),    # two rects per track -> two disjoint columns
+    xL = c(0.1, 0.1, 0.6, 0.6), xR = c(0.3, 0.3, 0.8, 0.8),
+    y0_npc = c(0.6, 0.1, 0.6, 0.1), y1_npc = c(0.9, 0.4, 0.9, 0.4),
+    stringsAsFactors = FALSE
+  )
+  grDevices::pdf(NULL); on.exit(grDevices::dev.off())
+  expect_equal(hl_count_polygons(lnk), 2L)
+})

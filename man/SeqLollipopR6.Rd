@@ -63,7 +63,9 @@ y-value (default 0). Also supports \code{color}, \code{linewidth}, \code{size}.}
 \if{latex}{\out{\hypertarget{method-SeqLollipop-prep}{}}}
 \subsection{Method \code{prep()}}{
 Resolve mappings, clip to windows, transform to npc. Builds
-per-window \code{list(x, y0, y1)} used by both the stem and the head.
+per-window \code{list(x, y0, y1, y_head, color, pch)}. \code{y0}/\code{y1} span the
+stem (baseline to value); \code{y_head} is the value's own npc position so
+the head renders at the value even when it is below the baseline.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{SeqLollipopR6$prep(layout_track, track_windows)}\if{html}{\out{</div>}}
 }
@@ -83,7 +85,7 @@ per-window \code{list(x, y0, y1)} used by both the stem and the head.
 \if{latex}{\out{\hypertarget{method-SeqLollipop-draw}{}}}
 \subsection{Method \code{draw()}}{
 Draw stems via \code{grid::grid.segments()} and heads via
-\code{grid::grid.points()}.
+\code{grid::grid.points()}, honouring any per-point \code{color}/\code{shape}.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{SeqLollipopR6$draw()}\if{html}{\out{</div>}}
 }
