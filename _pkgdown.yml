@@ -12,3 +12,6 @@ articles:
       - links
       - legends
       - genomic-data
+  - title: Rearrangements
+    contents:
+      - derivatives

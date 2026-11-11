@@ -10,6 +10,9 @@ seq_synteny(
   t0 = NULL,
   t1 = NULL,
   aesthetics = aes(),
+  height = NULL,
+  smooth = FALSE,
+  layer = c("above", "below"),
   ...
 )
 }
@@ -23,6 +26,14 @@ inside a \code{\link[=seq_track]{seq_track()}}.}
 
 \item{aesthetics}{Optional \code{\link[=aes]{aes()}}: \code{fill} / \code{color} (fill color),
 \code{alpha} (default \code{0.4}), \code{linewidth} (border width).}
+
+\item{height}{Optional block height as a fraction of the panel inner
+height. \code{NULL} (default) anchors at the panel edges.}
+
+\item{smooth}{Logical. Smoothstep sides instead of straight ones.}
+
+\item{layer}{\code{"above"} (default) draws after track elements; \code{"below"}
+draws before them, so ribbons sit beneath blocks.}
 
 \item{...}{Reserved.}
 }
@@ -38,7 +49,15 @@ intervals across two stacked tracks.
 \details{
 \code{data} may be a \code{GRanges} or a \code{data.frame}. Required \code{map()} fields are
 \code{x0} and \code{x1}; \code{x0_end} and \code{x1_end} default to one base past \code{x0}/\code{x1}
-when absent. \code{y0} and \code{y1} default to the bottom edge of t0's inner panel
-and the top edge of t1's inner panel respectively — no scale conversion is
-applied in that case.
+when absent. Numeric edges are used exactly (no rounding to whole bases).
+\code{y0} and \code{y1} default to the bottom edge of t0's inner panel and the top
+edge of t1's inner panel respectively — no scale conversion is applied in
+that case. With \code{height} set, the defaults become the facing edges of
+blocks of that height centred in each panel (the same geometry as
+\code{\link[=seq_block]{seq_block()}} and \code{\link[=seq_connector]{seq_connector()}}).
+
+The optional logical \code{map()} field \code{twisted} pairs \code{x0} with \code{x1_end} and
+\code{x0_end} with \code{x1}, so the two sides cross (an inverted copy). With
+\code{smooth = TRUE} each side follows a smoothstep curve (16 points per side),
+which turns twisted ribbons into S shapes.
 }

@@ -95,6 +95,10 @@ SeqTrackR6 <- R6::R6Class("SeqTrack",
     #'   windows, values are applied positionally. Any other length triggers a
     #'   warning and recycles with `rep_len()`.
     window_scale         = NULL,
+    #' @field x_span `NULL`, a numeric `c(min, max)` or `"shared"`. When set,
+    #'   each window panel is placed by its own coordinates on this span so
+    #'   that tracks with the same span share one x scale.
+    x_span               = NULL,
 
     #' @description Construct a SeqTrackR6.
     #' @param data GRanges default data.
@@ -135,6 +139,7 @@ SeqTrackR6 <- R6::R6Class("SeqTrack",
     #'   applies the value to all windows; length equal to the number of windows
     #'   uses values positionally; any other length triggers a warning and
     #'   recycles with `rep_len()`.
+    #' @param x_span `NULL`, a numeric `c(min, max)` or `"shared"`.
     #' @param ... Additional arguments (currently ignored).
     initialize = function(data = NULL, mapping = NULL, aesthetics = aes(),
                           windows = NULL, track_id = NULL,
@@ -153,7 +158,18 @@ SeqTrackR6 <- R6::R6Class("SeqTrack",
                           flip_x = FALSE, flip_y = FALSE,
                           elements = list(),
                           show_legend = TRUE,
-                          window_scale = NULL, ...) {
+                          window_scale = NULL, x_span = NULL, ...) {
+      if (!is.null(x_span)) {
+        if (isTRUE(combine_windows))
+          stop("x_span cannot be combined with combine_windows.", call. = FALSE)
+        ok <- identical(x_span, "shared") ||
+          (is.numeric(x_span) && length(x_span) == 2L && all(is.finite(x_span)) &&
+             x_span[2] > x_span[1])
+        if (!ok)
+          stop("x_span must be NULL, \"shared\" or a numeric c(min, max) with max > min.",
+               call. = FALSE)
+      }
+      self$x_span               <- x_span
       self$data                 <- data
       self$mapping              <- mapping
       self$aesthetics           <- aesthetics
@@ -322,6 +338,16 @@ SeqTrackR6 <- R6::R6Class("SeqTrack",
 #'   applies the value to all windows; length equal to the number of windows
 #'   uses values positionally; any other length triggers a warning and
 #'   recycles with `rep_len()`.
+#' @param x_span `NULL` (default), a numeric `c(min, max)` or `"shared"`. When
+#'   set, each window is placed at its own coordinates on a common span instead
+#'   of filling the track width, so the gaps between windows follow their
+#'   coordinates and every track with the same span has the same bp-per-width
+#'   scale. `"shared"` uses the union of the windows of every track in the plot
+#'   with `x_span = "shared"`. The x plot range of each window is its exact
+#'   window range (no scale expansion). Window and inner margins should be 0
+#'   for exact alignment across tracks. Cannot be combined with
+#'   `combine_windows`. Useful for pseudo-coordinate tracks such as assembled
+#'   or rearranged sequences drawn against a reference.
 #' @param ... Additional arguments reserved for future use.
 #' @return A `SeqTrackR6` instance (S3 class `"SeqTrack"`).
 #' @examples
@@ -344,7 +370,7 @@ seq_track <- function(data = NULL, mapping = NULL, aesthetics = aes(),
                       flip_x = FALSE, flip_y = FALSE,
                       elements = list(),
                       show_legend = TRUE,
-                      window_scale = NULL, ...) {
+                      window_scale = NULL, x_span = NULL, ...) {
   SeqTrackR6$new(
     data = data, mapping = mapping, aesthetics = aesthetics,
     windows = windows, track_id = track_id, direction = direction,
@@ -363,6 +389,7 @@ seq_track <- function(data = NULL, mapping = NULL, aesthetics = aes(),
     flip_y              = flip_y,
     elements            = elements,
     show_legend         = show_legend,
-    window_scale        = window_scale, ...
+    window_scale        = window_scale,
+    x_span              = x_span, ...
   )
 }

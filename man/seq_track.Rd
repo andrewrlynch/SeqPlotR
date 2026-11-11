@@ -31,6 +31,7 @@ seq_track(
   elements = list(),
   show_legend = TRUE,
   window_scale = NULL,
+  x_span = NULL,
   ...
 )
 }
@@ -123,6 +124,17 @@ factors (e.g. \code{1e-6} for Mb, \code{1e-3} for kb, \code{1} for bp). When \co
 applies the value to all windows; length equal to the number of windows
 uses values positionally; any other length triggers a warning and
 recycles with \code{rep_len()}.}
+
+\item{x_span}{\code{NULL} (default), a numeric \code{c(min, max)} or \code{"shared"}. When
+set, each window is placed at its own coordinates on a common span instead
+of filling the track width, so the gaps between windows follow their
+coordinates and every track with the same span has the same bp-per-width
+scale. \code{"shared"} uses the union of the windows of every track in the plot
+with \code{x_span = "shared"}. The x plot range of each window is its exact
+window range (no scale expansion). Window and inner margins should be 0
+for exact alignment across tracks. Cannot be combined with
+\code{combine_windows}. Useful for pseudo-coordinate tracks such as assembled
+or rearranged sequences drawn against a reference.}
 
 \item{...}{Additional arguments reserved for future use.}
 }

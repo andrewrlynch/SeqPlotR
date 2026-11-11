@@ -311,6 +311,16 @@ SeqPlotR6 <- R6::R6Class("SeqPlot",
       }
       pm_user <- plot_flat$margins %||% list()
       pm_final <- utils::modifyList(pm_default, pm_user)
+      # fixed bottom allowance (in lines) reserved by plot-level annotations
+      allowances <- vapply(self$plot_annotations, function(a) {
+        v <- a$allowance
+        if (is.numeric(v) && length(v) == 1L && is.finite(v)) v else 0
+      }, numeric(1))
+      if (sum(allowances) > 0) {
+        al_in <- grid::convertHeight(grid::unit(sum(allowances), "lines"),
+                                     "inches", valueOnly = TRUE)
+        pm_final$bottom <- pm_final$bottom + al_in / grDevices::dev.size("in")[2]
+      }
       plot_flat$margins <- pm_final
       self$flat_theme$margins <- pm_final
 
@@ -490,9 +500,9 @@ SeqPlotR6 <- R6::R6Class("SeqPlot",
       invisible(self)
     },
 
-    #' @description Draw all elements in drawing order: within-track
-    #'   non-links, then within-track links, then plot-level deferred links,
-    #'   then plot-level annotations.
+    #' @description Draw all elements in drawing order: below-layer links,
+    #'   then within-track non-links, then within-track links, then
+    #'   plot-level deferred links, then plot-level annotations.
     drawElements = function() {
       all_trks <- self$allTracks()
       if (length(all_trks) == 0) return(invisible(self))
@@ -541,6 +551,36 @@ SeqPlotR6 <- R6::R6Class("SeqPlot",
         track_windows_list[[key]] <- eff$windows
       }
 
+      # Build an axis-aware view of `layout_all_tracks` for a given link.
+      .link_layout_view <- function(link) {
+        tryCatch(
+          link$resolve(track_data    = NULL,
+                       track_mapping = NULL),
+          error = function(e) NULL
+        )
+        lapply(layout_all_tracks, function(panels)
+          .panels_for_element(panels, link$resolved))
+      }
+      .is_below <- function(e) inherits(e, "SeqLink") && identical(e$layer, "below")
+
+      # 0. below-layer links (within-track, then plot-level)
+      for (i in seq_along(all_trks)) {
+        for (elem in all_trks[[i]]$elements) {
+          if (!.is_below(elem)) next
+          elem$prep(layout_all_tracks  = .link_layout_view(elem),
+                    track_windows_list = track_windows_list,
+                    plot_track_index   = i)
+          elem$draw()
+        }
+      }
+      for (lnk in self$plot_links) {
+        if (!.is_below(lnk)) next
+        lnk$prep(layout_all_tracks  = .link_layout_view(lnk),
+                 track_windows_list = track_windows_list,
+                 plot_track_index   = NULL)
+        lnk$draw()
+      }
+
       # 1. within-track non-link elements
       for (i in seq_along(all_trks)) {
         track <- all_trks[[i]]
@@ -569,22 +609,11 @@ SeqPlotR6 <- R6::R6Class("SeqPlot",
         }
       }
 
-      # Build an axis-aware view of `layout_all_tracks` for a given link.
-      .link_layout_view <- function(link) {
-        tryCatch(
-          link$resolve(track_data    = NULL,
-                       track_mapping = NULL),
-          error = function(e) NULL
-        )
-        lapply(layout_all_tracks, function(panels)
-          .panels_for_element(panels, link$resolved))
-      }
-
       # 2. within-track links
       for (i in seq_along(all_trks)) {
         track <- all_trks[[i]]
         for (elem in track$elements) {
-          if (!inherits(elem, "SeqLink")) next
+          if (!inherits(elem, "SeqLink") || .is_below(elem)) next
           la <- .link_layout_view(elem)
           elem$prep(layout_all_tracks  = la,
                     track_windows_list = track_windows_list,
@@ -595,6 +624,7 @@ SeqPlotR6 <- R6::R6Class("SeqPlot",
 
       # 3. plot-level deferred links
       for (lnk in self$plot_links) {
+        if (.is_below(lnk)) next
         la <- .link_layout_view(lnk)
         lnk$prep(layout_all_tracks  = la,
                  track_windows_list = track_windows_list,
@@ -602,9 +632,10 @@ SeqPlotR6 <- R6::R6Class("SeqPlot",
         lnk$draw()
       }
 
-      # 4. plot-level annotations (placeholder — wrap defensively)
+      # 4. plot-level annotations
       for (ann in self$plot_annotations) {
-        tryCatch(ann$draw(), error = function(e) NULL)
+        if (is.function(ann$prep)) ann$prep(self$layout)
+        if (is.function(ann$draw)) ann$draw()
       }
 
       invisible(self)

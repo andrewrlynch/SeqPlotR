@@ -4,7 +4,16 @@
 \alias{.build_track_panels}
 \title{Build the panel metadata list for one track in one (x, y) bounding box}
 \usage{
-.build_track_panels(track, x0, x1, y0, y1, window_gap, track_key)
+.build_track_panels(
+  track,
+  x0,
+  x1,
+  y0,
+  y1,
+  window_gap,
+  track_key,
+  shared_x_span = NULL
+)
 }
 \arguments{
 \item{track}{A \code{SeqTrackR6} instance.}
@@ -17,6 +26,9 @@
 
 \item{track_key}{The value to store in each panel's \code{track} field — integer
 index in positional mode, \code{track_id} string in patchwork mode.}
+
+\item{shared_x_span}{Numeric \code{c(min, max)} used by tracks with
+\code{x_span = "shared"}, or \code{NULL}.}
 }
 \value{
 A list of per-window panel metadata.

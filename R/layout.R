@@ -196,10 +196,12 @@
 #' @param window_gap Numeric npc gap between adjacent window panels.
 #' @param track_key The value to store in each panel's `track` field — integer
 #'   index in positional mode, `track_id` string in patchwork mode.
+#' @param shared_x_span Numeric `c(min, max)` used by tracks with
+#'   `x_span = "shared"`, or `NULL`.
 #' @return A list of per-window panel metadata.
 #' @keywords internal
 .build_track_panels <- function(track, x0, x1, y0, y1,
-                                window_gap, track_key) {
+                                window_gap, track_key, shared_x_span = NULL) {
   # combine_windows: collapse multiple genomic windows into a single
   # virtual panel. Each window keeps its own genomic scale internally
   # (via the virtual map) so axes and per-window labels still render,
@@ -306,6 +308,11 @@
     yscale <- c(1, vmap_y$virtual_total)
   }
 
+  # x_span places each window by its own coordinates on a span shared with other tracks
+  span <- track$x_span
+  if (identical(span, "shared")) span <- shared_x_span %||% .shared_x_span(list(track))
+  span_w <- track_inner$x1 - track_inner$x0
+
   panels <- vector("list", nWin)
   x_cur  <- track_inner$x0
   # Pre-compute oob modes (default exclude) from the scales.
@@ -321,6 +328,10 @@
     w_width <- ww$rel[w] * plot_w
     px0 <- x_cur
     px1 <- x_cur + w_width
+    if (!is.null(span)) {
+      px0 <- track_inner$x0 + (BiocGenerics::start(win)[w] - span[1]) / diff(span) * span_w
+      px1 <- track_inner$x0 + (BiocGenerics::end(win)[w]   - span[1]) / diff(span) * span_w
+    }
     window_full  <- list(x0 = px0, x1 = px1,
                          y0 = track_inner$y0, y1 = track_inner$y1)
     window_outer <- shrink(window_full,  wom)  # after window_outer_margin
@@ -329,7 +340,7 @@
     xscale2_w <- .scale_to_xrange(track$scale_x2, win, w)
 
     # Compute the expanded plot range that elements should map against.
-    xplot_range_w <- if (!is.null(track$scale_x))
+    xplot_range_w <- if (!is.null(track$scale_x) && is.null(span))
       .compute_scale_breaks(track$scale_x, xscale_w)$plot_range
       else xscale_w
     yplot_range_w <- if (!is.null(track$scale_y))
@@ -428,6 +439,15 @@
   panels
 }
 
+# union of window coordinates over tracks with x_span = "shared"; NULL when none
+.shared_x_span <- function(tracks) {
+  wins <- lapply(Filter(function(t) identical(t$x_span, "shared") && !is.null(t$windows), tracks),
+                 function(t) t$windows)
+  if (length(wins) == 0L) return(NULL)
+  c(min(vapply(wins, function(w) min(BiocGenerics::start(w)), numeric(1))),
+    max(vapply(wins, function(w) max(BiocGenerics::end(w)), numeric(1))))
+}
+
 #' Compute the bounding box of a track from its panel list
 #'
 #' @param panels Output of `.build_track_panels()`.
@@ -488,6 +508,7 @@
   trackBounds <- list()
   track_count <- 0L
   cursor_y <- 1 - margins$top
+  shared_span <- .shared_x_span(unlist(rows, recursive = FALSE))
 
   for (r in seq_len(nRows)) {
     if (r > 1L) cursor_y <- cursor_y - trackGap
@@ -517,7 +538,8 @@
       track_count <- track_count + 1L
       panels <- .build_track_panels(
         track, x_left, x_right, y_bot, y_top,
-        window_gap = windowGap, track_key = track_count
+        window_gap = windowGap, track_key = track_count,
+        shared_x_span = shared_span
       )
       panelBounds[[track_count]] <- panels
       trackBounds[[track_count]] <- .panels_to_track_bounds(panels)
@@ -554,6 +576,7 @@
 
   panelBounds <- list()
   trackBounds <- list()
+  shared_span <- .shared_x_span(tracks)
 
   for (track in tracks) {
     tid <- track$track_id
@@ -568,7 +591,8 @@
 
     panels <- .build_track_panels(
       track, x0_track, x1_track, y0_track, y1_track,
-      window_gap = windowGap, track_key = tid
+      window_gap = windowGap, track_key = tid,
+      shared_x_span = shared_span
     )
     panelBounds[[tid]] <- panels
     trackBounds[[tid]] <- .panels_to_track_bounds(panels)

@@ -627,3 +627,7 @@ Builds a `seq_plot` with one track:
 Builds a `seq_plot` with one track (signal) and optionally a second track (genes):
 - `seq_area` for coverage signal, with `map(x = start, y = score)` auto-detected or user-overridden via `...`
 - If `show_genes` is a `GRanges`, appends a second track via `%__%` with `seq_gene(data = show_genes)`
+
+### `seq_rose_derivatives(x, fill, palette, synteny, show_loose, ...)`
+
+Draws a `plot_derivatives` table set (read with `seq_read_table_set()`) as one track per reference or derivative row, built from the generic elements `seq_block()`, `seq_connector()`, `seq_synteny()` (`twisted`, `smooth`, `layer`), `seq_track_label()` and `seq_caption()`. Tracks use `seq_track(x_span = "shared")` for a common base-pair scale. The adapter only maps table columns to element arguments and returns a `SeqPlot`. See the Rearrangements article (`vignettes/derivatives.Rmd`).

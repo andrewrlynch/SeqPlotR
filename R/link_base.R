@@ -31,6 +31,9 @@ SeqLinkR6 <- R6::R6Class("SeqLink",
     anchor0_gr = NULL,
     #' @field anchor1_gr Synthetic point GRanges for anchor 1.
     anchor1_gr = NULL,
+    #' @field layer Draw layer: `"above"` (after track elements, the default)
+    #'   or `"below"` (before any track element).
+    layer      = "above",
 
     #' @description Construct a new SeqLinkR6.
     #' @param data Optional `GRanges` or `data.frame`. A single argument
@@ -42,16 +45,20 @@ SeqLinkR6 <- R6::R6Class("SeqLink",
     #' @param aesthetics Optional `SeqAes`.
     #' @param legend Optional `LegendKey` or list of `LegendKey` objects.
     #' @param show_legend Logical. Set to `FALSE` to suppress legend output.
+    #' @param layer `"above"` or `"below"`; `"below"` links are drawn before
+    #'   any track element.
     #' @param ... Unused — accepted so subclasses can pass extra arguments.
     initialize = function(data = NULL, mapping = NULL,
                           t0 = NULL, t1 = NULL,
                           aesthetics = aes(),
-                          legend = NULL, show_legend = TRUE, ...) {
+                          legend = NULL, show_legend = TRUE,
+                          layer = "above", ...) {
       super$initialize(data, mapping, aesthetics)
       self$t0          <- t0
       self$t1          <- t1
       self$legend      <- legend
       self$show_legend <- show_legend
+      self$layer       <- match.arg(layer, c("above", "below"))
     },
 
     #' @description Resolve the mapping against the effective `data`, then
