@@ -1,0 +1,10 @@
+group_id	layer	x	y	members	label
+1	1	1	0.15	sv_1	sv_1
+2	5	2	0.55	sv_5	sv_5
+3	2	3	0.2	gain_1_1	gain_1_1
+4	3	4	0.3	sv_2	sv_2
+5	1	5	0.3	amp_2	amp_2
+6	6	7	0.625	sv_3;loss_3_1	sv_3;loss_3_1
+7	0	7	0.525	sv_4	sv_4
+8	7	9	0.7	sv_6	sv_6
+9	4	10	0.45	wgd_1	wgd_1

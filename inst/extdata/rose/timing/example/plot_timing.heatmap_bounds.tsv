@@ -1,0 +1,4 @@
+seg_id	chr	start	end	direction	y
+4	chr2	50000001	70000000	gain	0.3
+7	chr3	94000001	198295559	loss	0.5
+7	chr3	94000001	198295559	loss	0.8

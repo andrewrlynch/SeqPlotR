@@ -316,6 +316,35 @@ p <- seq_rose_timing(gain, layout = "arches") %+%
 p$plot()
 ```
 
-## What ROSE does not yet provide
+## An illustrative example set
 
-The adapter uses only what the tables carry, and a few things are left to the caller or to a later ROSE export: genome-wide events such as WGD have no position in `glyphs` and so cannot be placed; there is no flag saying whether the heatmap holds SNV-derived density; the copy-number axis maximum is derived from the tables rather than stored; and annotation colours are assigned from `flexoki_palette()` because the tables name classes without a palette.
+`inst/extdata/rose/timing/example` is a small `plot_timing` table set written by hand to show cases the simulated fixtures lack. It is an illustrative example, not ROSE output and not a simulation: the numbers were chosen to exercise the drawing rules and carry no biological meaning. It has a copy-number maximum above 8 (log axis, `cn_log_axis` TRUE), a single-breakend SV (SGL, no second anchor), an SV without timing, a translocation, an ecDNA caution, a hidden glyph, annotation rows, a whole-genome doubling, and conflict, unordered and exchangeable poset edges.
+
+```{r example-arches, fig.height = 8}
+ex <- file.path(tm, "example")
+p <- seq_rose_timing(ex, layout = "arches", plain = TRUE, show_hidden = TRUE)
+p$plot()
+```
+
+The log copy-number axis, the SGL arch (grey, one end) and the untimed SV (drawn to the top of the axis without a bar) are on the first two tracks. The WGD is the black line across all windows on the lower track, and the strip at the very bottom lists the hidden glyph. In the order layout the WGD is drawn at its poset layer.
+
+```{r example-order, fig.height = 8}
+p <- seq_rose_timing(ex, layout = "order", plain = TRUE)
+p$plot()
+```
+
+```{r example-heatmap, fig.height = 8}
+p <- seq_rose_timing(ex, layout = "heatmap", plain = TRUE)
+p$plot()
+```
+
+The poset shows the conflict marker, the dashed unordered and exchangeable edges, and the WGD diamond.
+
+```{r example-poset}
+p <- seq_rose_timing(ex, layout = "poset")
+p$plot()
+```
+
+## Limits of the tables
+
+The adapter uses only what the tables carry. There is no flag saying whether the heatmap holds SNV-derived density, the copy-number axis maximum is derived from the tables rather than stored, and annotation colours are assigned from `flexoki_palette()` because the tables name classes without a palette. Rows without a position (a WGD) are drawn across every window.

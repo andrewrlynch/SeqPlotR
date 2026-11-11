@@ -1,0 +1,12 @@
+from_event	to_event	kind	arrow	style_key	label	conflict
+sv_1	gain_1_1	hasse	TRUE	snv	fixed	FALSE
+gain_1_1	sv_2	hasse	TRUE	snv	>0.99	FALSE
+sv_2	wgd_1	hasse	TRUE	snv	>0.99	FALSE
+wgd_1	sv_5	hasse	TRUE	snv	0.93	FALSE
+sv_5	sv_3	hasse	TRUE	mixed	0.81	FALSE
+sv_5	loss_3_1	hasse	TRUE	mixed	0.76	FALSE
+sv_3	sv_6	hasse	TRUE	mixed	0.64	TRUE
+loss_3_1	sv_6	hasse	TRUE	structure	0.58	FALSE
+amp_2	sv_6	hasse	TRUE	structure	0.71	FALSE
+sv_4	sv_3	unordered	FALSE	structure	NA	FALSE
+amp_2	sv_1	exchangeable	FALSE	structure	NA	FALSE

@@ -1,0 +1,7 @@
+seg_id	haplotype	step	event_id	chr	start	end	direction	delta	k	label	credit	timing_basis	bound_type	glyph	y	bar_lo	bar_hi	faded	alpha	colour_key
+2	A	1	gain_1_1	chr1	120000001	248956422	gain	1	1	NA	0.85	snv	NA	point	0.2	0.12	0.28	FALSE	0.8875	gain
+4	A	1	amp_2	chr2	50000001	70000000	gain	10	3	+10	1	proxy	earliest	earliest	0.3	0.3	1	TRUE	0.4	gain
+7	B	1	loss_3_1	chr3	94000001	198295559	loss	-2	2	-2	0.7	proxy	interval	interval	NA	0.5	0.8	TRUE	0.31	loss
+NA	NA	NA	wgd_1	chr1	1	248956422	wgd	NA	1	NA	1	snv	NA	point	0.45	0.4	0.5	FALSE	1	wgd
+NA	NA	NA	wgd_1	chr2	1	242193529	wgd	NA	1	NA	1	snv	NA	point	0.45	0.4	0.5	FALSE	1	wgd
+NA	NA	NA	wgd_1	chr3	1	198295559	wgd	NA	1	NA	1	snv	NA	point	0.45	0.4	0.5	FALSE	1	wgd

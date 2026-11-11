@@ -1,0 +1,11 @@
+event_id	type	shape_key	x	y	bar_lo	bar_hi	glyph	anchor_y	layer	group_id	faded	alpha	label
+sv_1	SV	SV	1	0.15	0.08	0.24	point	0.15	1	1	FALSE	1	sv_1
+sv_5	SV	SV	2	0.55	0.48	0.62	point	0.55	5	2	FALSE	1	sv_5
+gain_1_1	GAIN	GAIN	3	0.2	0.12	0.28	point	0.2	2	3	FALSE	1	gain_1_1
+sv_2	SV	SV	4	0.3	0.22	0.38	point	0.3	3	4	FALSE	1	sv_2
+amp_2	GAIN	GAIN	5	NA	0.3	1	earliest	0.3	1	5	TRUE	0.4	amp_2
+sv_3	SV	SV	6	0.6	0	0.6	latest	0.6	6	6	TRUE	0.4	sv_3
+sv_4	SV	SV	7	NA	0.35	0.7	interval	0.525	0	7	TRUE	0.4	sv_4
+loss_3_1	LOSS	LOSS	8	NA	0.5	0.8	interval	0.65	6	6	TRUE	0.31	loss_3_1
+sv_6	SV	SV	9	0.7	0.7	1	earliest	0.7	7	8	TRUE	0.4	sv_6
+wgd_1	WGD	WGD	10	0.45	0.4	0.5	point	0.45	4	9	FALSE	1	wgd_1

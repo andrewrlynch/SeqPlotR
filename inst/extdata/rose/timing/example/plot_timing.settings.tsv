@@ -1,0 +1,2 @@
+n_bins	smooth_sd	d_max	k_cap	n_draws	cn_log_axis
+10	0.01	9	3	1000	TRUE
