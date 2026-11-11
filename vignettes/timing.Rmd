@@ -280,7 +280,7 @@ p$plot()
 
 ## Whole-genome doubling and losses
 
-This fixture has three windows and no SV arches. Glyphs marked `earliest` and `latest` are proxy rows: they place an event before or after a point, so they are drawn as one-sided bounds rather than as times. SNVs above the axis maximum are excluded with a message.
+This fixture has three windows and no SV arches. The WGD has no position, so it is drawn as a black line across every window at its time. Glyphs marked `earliest` and `latest` are proxy rows: they place an event before or after a point, so they are drawn as one-sided bounds rather than as times. SNVs above the axis maximum are excluded with a message.
 
 ```{r wgd-arches}
 wgd <- file.path(tm, "sim_wgd_losses")

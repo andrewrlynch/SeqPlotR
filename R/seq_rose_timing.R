@@ -50,7 +50,8 @@
 #' [seq_tile_mix()], [seq_node_link()], [seq_span_strip()]). The tables carry
 #' every position, interval, opacity, label and colour category, so the adapter
 #' only selects rows, renames columns, looks up palette colours and sets axes.
-#' Proxy rows are order bounds, not times.
+#' Proxy rows are order bounds, not times. Glyph rows without a position, such as
+#' a whole-genome doubling, are drawn across every window at their given `y`.
 #'
 #' @param x A directory holding the `plot_timing.*` files, or a list of data
 #'   frames with a `schema_version` element or attribute. Read with
@@ -136,7 +137,7 @@ seq_rose_timing <- function(x, layout = c("arches", "order", "heatmap", "poset")
     else gp <- gp[0, , drop = FALSE]
     shp <- c(SV = "circle", GAIN = "triangle_up", LOSS = "triangle_down", WGD = "diamond")
     nodes <- if (nrow(nd)) data.frame(
-      id = nd$event_id, x = nd$x, y = nd$y, bar_lo = nd$bar_lo, bar_hi = nd$bar_hi,
+      id = nd$event_id, x = nd$x, y = if ("anchor_y" %in% names(nd)) ifelse(is.na(nd$anchor_y), nd$y, nd$anchor_y) else nd$y, bar_lo = nd$bar_lo, bar_hi = nd$bar_hi,
       shape = pick(shp, nd$shape_key, "circle"), fill = pick(pal$node, nd$shape_key, "grey60"),
       alpha = nd$alpha, label = nd$label, stringsAsFactors = FALSE)
     edge_style <- function(kind, style) {
@@ -191,6 +192,30 @@ seq_rose_timing <- function(x, layout = c("arches", "order", "heatmap", "poset")
   an <- tb$annotations
   av <- tb$sv_arches
   steps <- tb$cn_steps
+  # genome-wide event rows (NA position) are drawn across every window
+  gw <- g[!is.na(g$glyph) & g$glyph != "hidden" & is.na(g$chr) & is.na(g$x), , drop = FALSE]
+  if (layout == "arches") gw <- gw[!gw$source_id %in% steps$event_id, , drop = FALSE]
+  gw_key <- steps$colour_key[match(gw$source_id, steps$event_id)]
+  gw_key <- ifelse(is.na(gw_key), tolower(tb$poset_nodes$shape_key[match(gw$source_id, tb$poset_nodes$event_id)]), gw_key)
+  gw_layer <- tb$poset_nodes$layer[match(gw$source_id, tb$poset_nodes$event_id)]
+  if (layout == "order") { gw <- gw[!is.na(gw_layer), , drop = FALSE]; gw_key <- gw_key[!is.na(gw_layer)]; gw_layer <- gw_layer[!is.na(gw_layer)] }
+  step_lab <- c(gain = "Gain", loss = "Loss", wgd = "WGD")
+  gw_els <- function() {
+    if (!nrow(gw)) return(list())
+    ord <- layout == "order"
+    ix <- rep(seq_len(nrow(gw)), each = nrow(w))
+    iw <- rep(seq_len(nrow(w)), times = nrow(gw))
+    col <- ifelse(is.na(gw_key), pick(pal$glyph, gw$colour_key, "grey55"), pick(pal$step, gw_key, "grey40"))
+    lab <- ifelse(gw_key %in% names(step_lab), step_lab[gw_key], ifelse(is.na(gw_key), gw$colour_key, gw_key))
+    ukeys <- !duplicated(lab)
+    list(seq_step_ribbon(
+      to_gr(data.frame(chr = w$chr[iw], start = w$start[iw], end = w$end[iw],
+                       y = if (ord) gw_layer[ix] else gw$y[ix],
+                       lo = if (ord) NA_real_ else gw$bar_lo[ix], hi = if (ord) NA_real_ else gw$bar_hi[ix],
+                       col = col[ix], alpha = gw$alpha[ix], label = NA_character_, stringsAsFactors = FALSE)),
+      mp(x0 = "start", x1 = "end", y = "y", label = "label", bar_lo = "lo", bar_hi = "hi", color = "col", alpha = "alpha"),
+      legend = leg(Map(k_rect, lab[ukeys], col[ukeys]))))
+  }
   glyph_lab <- c(point = "SNV time", latest = "Proxy bound: before", earliest = "Proxy bound: after",
                  interval = "Proxy bound: between", untimed = "SV, no timing")
 
@@ -202,9 +227,10 @@ seq_rose_timing <- function(x, layout = c("arches", "order", "heatmap", "poset")
 
   # sv track ----
   sv_els <- list()
-  sv_ylim <- if (layout == "order") c(0, max(c(0, av$layer), na.rm = TRUE) + 0.3) else c(0, 1)
+  lay_max <- max(c(0, av$layer, gw_layer), na.rm = TRUE)
+  sv_ylim <- if (layout == "order") c(0, lay_max + 0.3) else c(0, 1)
   sv_scale <- if (layout == "order") {
-    seq_scale_continuous(limits = sv_ylim, breaks = 0:max(c(0, av$layer), na.rm = TRUE))
+    seq_scale_continuous(limits = sv_ylim, breaks = 0:lay_max)
   } else tau_scale
   gtypes <- c(av$glyph[layout != "order"], g_ok$glyph)
   gkeys <- seq_glyph_legend_keys(unique(gtypes), labels = glyph_lab)
@@ -219,6 +245,8 @@ seq_rose_timing <- function(x, layout = c("arches", "order", "heatmap", "poset")
           label = "label", caution = "caution"),
       legend = if (has_arch) FALSE else leg(unname(gkeys)))))
   }
+
+  if (layout %in% c("arches", "order")) sv_els <- c(sv_els, gw_els())
 
   # cn track ----
   cn_els <- list(seq_paired_ribbon(
@@ -315,19 +343,21 @@ seq_rose_timing <- function(x, layout = c("arches", "order", "heatmap", "poset")
     }
   }
 
+  if (layout == "heatmap") heat_els <- c(heat_els, gw_els())
+
   # labels and hidden tracks ----
   lab_els <- list()
   if (nrow(g_span)) {
     lab_els <- c(lab_els, list(seq_span_strip(
       to_gr(data.frame(chr = g_span$chr, start = g_span$start, end = g_span$end, label = g_span$label,
                        stringsAsFactors = FALSE)),
-      mp(x0 = "start", x1 = "end", label = "label"), aes(bar_y = 0.3))))
+      mp(x0 = "start", x1 = "end", label = "label"), aes(bar_y = 0.2))))
   }
   if (nrow(an)) {
     lab_els <- c(lab_els, list(seq_span_strip(
       to_gr(data.frame(chr = an$chr, start = an$start, end = an$end, label = an$label,
                        fill = pick(ann_pal, an$colour_key, "grey70"), stringsAsFactors = FALSE)),
-      mp(x0 = "start", x1 = "end", label = "label", fill = "fill"), aes(bar_y = 0.75),
+      mp(x0 = "start", x1 = "end", label = "label", fill = "fill"), aes(bar_y = 0.68),
       legend = leg(lapply(ann_keys, function(k) k_rect(k, pick(ann_pal, k, "grey70")))))))
   }
   hid_els <- list()
@@ -342,7 +372,7 @@ seq_rose_timing <- function(x, layout = c("arches", "order", "heatmap", "poset")
   sv_title <- if (layout == "order") "SV event order (poset layer; 0 = unordered)" else "SV event time (tau)"
   unit_y <- seq_scale_continuous(limits = c(0, 1))
   spec <- list()
-  if (length(lab_els)) spec$labels <- list(els = lab_els, scale = unit_y, title = NULL, height = 0.2)
+  if (length(lab_els)) spec$labels <- list(els = lab_els, scale = unit_y, title = NULL, height = 0.3)
   spec$sv <- list(els = sv_els, scale = sv_scale, title = sv_title, height = 1)
   spec$cn <- list(els = cn_els, scale = seq_scale_count(cn_max, log = cn_log), title = cn_title, height = 1)
   if (layout == "arches") spec$steps <- list(els = steps_els, scale = tau_scale, title = "CN event time (tau)", height = 1)
@@ -370,7 +400,7 @@ seq_rose_timing <- function(x, layout = c("arches", "order", "heatmap", "poset")
                                  track_outer_margin = ide_m, track_inner_margin = ide_m, window_inner_margin = ide_m,
                                  aesthetics = do.call(aes, blank_y), elements = list(seq_ideogram(data = cb)))))
   }
-  p <- seq_plot(aesthetics = aes(margins = list(top = 0, right = legend_width, bottom = 0.02, left = 0)), ...)
+  p <- seq_plot(aesthetics = aes(margins = list(top = if (length(lab_els)) 0.04 else 0, right = legend_width, bottom = 0.02, left = 0)), ...)
   for (t in trk) p <- p %+% t
   p
 }

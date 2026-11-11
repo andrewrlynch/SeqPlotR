@@ -56,7 +56,8 @@ Thin adapter that turns a \code{plot_timing} table set written by ROSE into a
 \code{\link[=seq_tile_mix]{seq_tile_mix()}}, \code{\link[=seq_node_link]{seq_node_link()}}, \code{\link[=seq_span_strip]{seq_span_strip()}}). The tables carry
 every position, interval, opacity, label and colour category, so the adapter
 only selects rows, renames columns, looks up palette colours and sets axes.
-Proxy rows are order bounds, not times.
+Proxy rows are order bounds, not times. Glyph rows without a position, such as
+a whole-genome doubling, are drawn across every window at their given \code{y}.
 }
 \examples{
 d <- system.file("extdata", "rose", "timing", "sim_bfb_amplicon", package = "SeqPlotR")
