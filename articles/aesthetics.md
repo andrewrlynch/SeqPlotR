@@ -1,4 +1,4 @@
-# Aesthetics, Axes, and Secondary Scales
+# Aesthetics, Axes, and Scales
 
 ``` r
 
@@ -51,8 +51,8 @@ argument on
 accepts ggplot2-style hierarchical theme keys. Dotted paths like
 `axis.x1.line.col` let you target any axis component, and broader keys
 (`axis.line.col`, `axis.x.line.col`) cascade into the more specific
-slots. This vignette shows the hierarchy, scale controls (expansion,
-break placement, axis capping), secondary axes, and track chrome.
+slots. This vignette covers the hierarchy, scale controls, secondary
+axes, axis titles, gridlines and track chrome.
 
 ## A shared example
 
@@ -77,7 +77,7 @@ of the chunk — knitr auto-prints the result via
 [`print.SeqPlot()`](http://andrewlynch.io/SeqPlotR/reference/print.SeqPlot.md),
 which calls `$plot()` on the current device.
 
-## 1. Hierarchical theme keys
+## Hierarchical theme keys
 
 The axis namespace has four levels of specificity:
 
@@ -108,7 +108,7 @@ p
 
 ![](aesthetics_files/figure-html/hierarchy-1.png)
 
-## 2. Nested `aes()` values
+## Nested `aes()` values
 
 The same keys can be written in a nested form.
 `aes(axis.x = aes(position = "top"))` is identical to
@@ -131,7 +131,7 @@ p
 
 ![](aesthetics_files/figure-html/nested-1.png)
 
-## 3. Scale expansion, breaks, and caps
+## Scale expansion, breaks, caps, and limits
 
 Each axis’s scale options live under `axis.<side>.scale.*`:
 
@@ -178,7 +178,36 @@ seq_plot() %+%
   seq_point(map(x = start, y = score))
 ```
 
-## 4. Secondary axes
+Expansion applies to element coordinates as well as the axis. Points
+outside the (expanded) range are handled by `oob`: `"exclude"` (default)
+drops them and reports a count, `"perimeter"` clamps them to the limit.
+`pretty = list(...)` forwards extra arguments to base
+[`pretty()`](https://rdrr.io/r/base/pretty.html) for break placement.
+
+``` r
+
+gx <- GRanges("chr1", IRanges(sample(1:1e6, 200), width = 1),
+              xv = runif(200, -3, 13), score = runif(200, 0, 6))
+mk <- function(lab, ...) {
+  seq_track(data = gx, windows = win, mapping = map(x = xv, y = score),
+            scale_x = seq_scale_continuous(limits = c(0, 10), ...),
+            aesthetics = aes("axis.x.title.label" = lab)) %+% seq_point()
+}
+
+(seq_plot() %+%
+   mk("expand = c(0.2, 0)", expand = c(0.2, 0)) %__%
+   mk("oob = exclude", oob = "exclude") %__%
+   mk("oob = perimeter", oob = "perimeter") %__%
+   mk("pretty = list(n = 10, min.n = 5)", pretty = list(n = 10, min.n = 5)))$plot()
+#> 22 out-of-bounds data points excluded! (seq_point)
+#> 72 out-of-bounds data points excluded! (seq_point)
+#> 72 out-of-bounds data points plotted! (seq_point)
+#> 72 out-of-bounds data points excluded! (seq_point)
+```
+
+![](aesthetics_files/figure-html/scale-extras-1.png)
+
+## Secondary axes
 
 An element opts in to the secondary axis by adding `axis.x = 2` or
 `axis.y = 2` to its
@@ -228,7 +257,61 @@ p
 
 ![](aesthetics_files/figure-html/stacked-axes-1.png)
 
-## 5. Track and window chrome
+## Axis titles, blanked chrome, and in-panel axes
+
+The default axis title comes from the first element’s mapping, then the
+track mapping, then the seqname on genomic axes (the last track below
+shows the default, `xv`). Override with `axis.<side>.title.label` or a
+styled `aes(label, col, size)`. Setting a structural sub-key (`line`,
+`title`, `ticks`, `labels`, `text`, `gridline`) to `NA` blanks it, like
+`element_blank()`.
+
+``` r
+
+gt <- GRanges("chr1", IRanges(start(d), width = 1),
+              xv = runif(50, 0, 10), score = d$score)
+
+(seq_plot() %+%
+   (seq_track(data = gt, windows = win, mapping = map(x = xv, y = score),
+              aesthetics = aes(axis.x.title = aes(label = "Styled title",
+                                                  col = "#A0282C", size = 1))) %+%
+      seq_point()) %__%
+   (seq_track(data = gt, windows = win, mapping = map(x = xv, y = score),
+              aesthetics = aes("axis.x.line" = NA, "axis.x.ticks" = NA,
+                               "axis.x.text" = NA)) %+%
+      seq_point()))$plot()
+```
+
+![](aesthetics_files/figure-html/titles-1.png)
+
+Titles and range labels can also live inside the panel with
+`axis.<dim>.title.position` and `axis.<dim>.labels.style` / `.position`.
+Here the y title sits at NPC `(0.02, 0.95)` and a single bracketed range
+label replaces the per-tick labels.
+
+``` r
+
+win <- GRanges("chr1", IRanges(1, 1000))
+gr  <- GRanges("chr1", IRanges(c(100, 400, 700), width = 80),
+               score = c(1, 3, 2))
+
+p <- seq_plot() %+%
+  (seq_track(
+     data    = gr, windows = win,
+     aesthetics = aes(
+       "axis.y.title.text"      = "Score",
+       "axis.y.title.position"  = c(0.02, 0.95),
+       "axis.y.labels.style"    = "range",
+       "axis.y.labels.position" = c(0.02, 0.05)
+     )
+   ) %+%
+   seq_bar(map(x = start, y = score)))
+p$plot()
+```
+
+![](aesthetics_files/figure-html/in-panel-axes-1.png)
+
+## Track and window chrome
 
 The `track.*` namespace controls the rectangle shared by all windows;
 `track.window.*` controls each per-window panel rectangle. These do not
@@ -250,7 +333,7 @@ p
 
 ![](aesthetics_files/figure-html/chrome-1.png)
 
-## 6. Gridlines
+## Gridlines
 
 Gridlines are drawn at the same positions as axis ticks, but are off by
 default. Enable them per dimension with `axis.x.gridline = TRUE` or
@@ -335,7 +418,7 @@ p
 
 ![](aesthetics_files/figure-html/gridlines-per-track-1.png)
 
-## 7. Plot-level vs track-level themes
+## Plot-level vs track-level themes
 
 Themes set on
 [`seq_plot()`](http://andrewlynch.io/SeqPlotR/reference/seq_plot.md)

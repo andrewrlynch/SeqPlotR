@@ -59,4 +59,6 @@ seq_bar(map(x = start, y = score))
 #>     resolve: function (track_data = NULL, track_mapping = NULL) 
 #>     resolved: NULL
 #>     show_legend: TRUE
+#>     y_fields: y y_end y_min y_max y0 y1 height
+#>     y_transform: NULL
 ```

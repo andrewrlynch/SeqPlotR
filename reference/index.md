@@ -5,6 +5,18 @@
 - [`LegendKey()`](http://andrewlynch.io/SeqPlotR/reference/LegendKey.md)
   : Legend Key
 
+- [`SeqArchR6`](http://andrewlynch.io/SeqPlotR/reference/SeqArchR6.md) :
+  SeqArch R6 class
+
+- [`SeqElementR6`](http://andrewlynch.io/SeqPlotR/reference/SeqElementR6.md)
+  : SeqElement R6 base class
+
+- [`SeqLinkR6`](http://andrewlynch.io/SeqPlotR/reference/SeqLinkR6.md) :
+  SeqLink R6 base class
+
+- [`SeqPointR6`](http://andrewlynch.io/SeqPlotR/reference/SeqPointR6.md)
+  : SeqPoint R6 class
+
 - [`aes()`](http://andrewlynch.io/SeqPlotR/reference/aes.md) : Capture
   evaluated constant aesthetics
 
@@ -77,14 +89,26 @@
 - [`seq_blank()`](http://andrewlynch.io/SeqPlotR/reference/seq_blank.md)
   : Return a blank plot-level placeholder
 
+- [`seq_block()`](http://andrewlynch.io/SeqPlotR/reference/seq_block.md)
+  : Ideogram-slice blocks
+
+- [`seq_caption()`](http://andrewlynch.io/SeqPlotR/reference/seq_caption.md)
+  : Caption and banner under the figure
+
 - [`seq_chip()`](http://andrewlynch.io/SeqPlotR/reference/seq_chip.md) :
   ChIP-style multi-track signal + peaks plot
 
 - [`seq_cn_heatmap()`](http://andrewlynch.io/SeqPlotR/reference/seq_cn_heatmap.md)
   : Multi-sample copy-number heatmap
 
+- [`seq_connector()`](http://andrewlynch.io/SeqPlotR/reference/seq_connector.md)
+  : Bezier connector between interval edges
+
 - [`seq_copynumber()`](http://andrewlynch.io/SeqPlotR/reference/seq_copynumber.md)
   : Copy-number scatter plot
+
+- [`seq_cross_arch()`](http://andrewlynch.io/SeqPlotR/reference/seq_cross_arch.md)
+  : Arches whose stems rise from one track to tops on another
 
 - [`seq_curve()`](http://andrewlynch.io/SeqPlotR/reference/seq_curve.md)
   : Draw bezier curves
@@ -94,6 +118,9 @@
 
 - [`seq_gene()`](http://andrewlynch.io/SeqPlotR/reference/seq_gene.md) :
   Draw gene models
+
+- [`seq_glyph_legend_keys()`](http://andrewlynch.io/SeqPlotR/reference/seq_glyph_legend_keys.md)
+  : Legend keys for interval glyph types
 
 - [`seq_gradient_legend()`](http://andrewlynch.io/SeqPlotR/reference/seq_gradient_legend.md)
   : Create a color gradient (color-bar) legend specification
@@ -107,14 +134,27 @@
 - [`seq_ideogram()`](http://andrewlynch.io/SeqPlotR/reference/seq_ideogram.md)
   : Chromosome ideogram from cytogenetic bands
 
+- [`seq_interval_glyph()`](http://andrewlynch.io/SeqPlotR/reference/seq_interval_glyph.md)
+  : Draw interval glyphs: point estimates, one-sided bounds and
+  intervals
+
 - [`seq_legend()`](http://andrewlynch.io/SeqPlotR/reference/seq_legend.md)
   : Create a legend placement specification
+
+- [`seq_legend_2d()`](http://andrewlynch.io/SeqPlotR/reference/seq_legend_2d.md)
+  : Two-channel colour key specification
 
 - [`seq_line()`](http://andrewlynch.io/SeqPlotR/reference/seq_line.md) :
   Draw a line
 
 - [`seq_lollipop()`](http://andrewlynch.io/SeqPlotR/reference/seq_lollipop.md)
   : Draw lollipops
+
+- [`seq_node_link()`](http://andrewlynch.io/SeqPlotR/reference/seq_node_link.md)
+  : Draw a node-link panel
+
+- [`seq_paired_ribbon()`](http://andrewlynch.io/SeqPlotR/reference/seq_paired_ribbon.md)
+  : Draw paired ribbons for two values per span
 
 - [`seq_path()`](http://andrewlynch.io/SeqPlotR/reference/seq_path.md) :
   Draw connected paths
@@ -134,6 +174,9 @@
 - [`seq_preview_layout()`](http://andrewlynch.io/SeqPlotR/reference/seq_preview_layout.md)
   : Preview the grid layout of a SeqPlotR plot
 
+- [`seq_read_table_set()`](http://andrewlynch.io/SeqPlotR/reference/seq_read_table_set.md)
+  : Read a table set
+
 - [`seq_reads()`](http://andrewlynch.io/SeqPlotR/reference/seq_reads.md)
   : IGV-style read alignment track element
 
@@ -146,6 +189,12 @@
 - [`seq_ribbon()`](http://andrewlynch.io/SeqPlotR/reference/seq_ribbon.md)
   : Draw a filled ribbon between two y series
 
+- [`seq_rose_derivatives()`](http://andrewlynch.io/SeqPlotR/reference/seq_rose_derivatives.md)
+  : Plot a derivative-chromosome reconstruction
+
+- [`seq_rose_timing()`](http://andrewlynch.io/SeqPlotR/reference/seq_rose_timing.md)
+  : Draw a ROSE timing plot table set
+
 - [`seq_scale_color_continuous()`](http://andrewlynch.io/SeqPlotR/reference/seq_scale_color_continuous.md)
   [`seq_scale_fill_continuous()`](http://andrewlynch.io/SeqPlotR/reference/seq_scale_color_continuous.md)
   : Continuous color scale for SeqAes mappings
@@ -156,6 +205,9 @@
 
 - [`seq_scale_continuous()`](http://andrewlynch.io/SeqPlotR/reference/seq_scale_continuous.md)
   : Continuous position scale
+
+- [`seq_scale_count()`](http://andrewlynch.io/SeqPlotR/reference/seq_scale_count.md)
+  : Count position scale with an optional pseudo-log transform
 
 - [`seq_scale_discrete()`](http://andrewlynch.io/SeqPlotR/reference/seq_scale_discrete.md)
   : Discrete position scale
@@ -172,6 +224,12 @@
 - [`seq_sequence()`](http://andrewlynch.io/SeqPlotR/reference/seq_sequence.md)
   : IGV-style nucleotide sequence track element
 
+- [`seq_span_strip()`](http://andrewlynch.io/SeqPlotR/reference/seq_span_strip.md)
+  : Draw labelled genomic spans
+
+- [`seq_step_ribbon()`](http://andrewlynch.io/SeqPlotR/reference/seq_step_ribbon.md)
+  : Draw step ribbons with interval bars and direction triangles
+
 - [`seq_string()`](http://andrewlynch.io/SeqPlotR/reference/seq_string.md)
   : Cubic-Bezier string link between two genomic loci
 
@@ -184,8 +242,17 @@
 - [`seq_tile()`](http://andrewlynch.io/SeqPlotR/reference/seq_tile.md) :
   Draw tiles (rectangles or rotated diamonds)
 
+- [`seq_tile_mix()`](http://andrewlynch.io/SeqPlotR/reference/seq_tile_mix.md)
+  : Draw two-channel colour tiles
+
+- [`seq_to_canvas()`](http://andrewlynch.io/SeqPlotR/reference/seq_to_canvas.md)
+  : Map data coordinates into a panel's canvas npc coordinates
+
 - [`seq_track()`](http://andrewlynch.io/SeqPlotR/reference/seq_track.md)
   : Create a new seq_track
+
+- [`seq_track_label()`](http://andrewlynch.io/SeqPlotR/reference/seq_track_label.md)
+  : Track label with an optional second line
 
 - [`seq_zoom()`](http://andrewlynch.io/SeqPlotR/reference/seq_zoom.md) :
   Zoom / highlight polygon between two tracks

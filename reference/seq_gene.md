@@ -112,4 +112,6 @@ seq_gene(map(group = gene_id, strand = strand, label = gene_name))
 #>     show_start: FALSE
 #>     style_type: exon
 #>     tss_position: NULL
+#>     y_fields: y y_end y_min y_max y0 y1 height
+#>     y_transform: NULL
 ```

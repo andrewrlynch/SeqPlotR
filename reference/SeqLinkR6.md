@@ -1,21 +1,19 @@
 # SeqLink R6 base class
 
-SeqLink R6 base class
-
-SeqLink R6 base class
-
-## Details
-
-Internal R6 generator for cross-track and within-track link elements.
-Extends
+R6 generator for cross-track and within-track link elements, exported
+for subclassing. Extends
 [`SeqElementR6`](http://andrewlynch.io/SeqPlotR/reference/SeqElementR6.md)
 with track identifiers and a pair of anchor GRanges synthesised from the
 resolved [`map()`](http://andrewlynch.io/SeqPlotR/reference/map.md)
-fields.
+fields. Subclasses implement
+`prep(layout_all_tracks, track_windows_list, plot_track_index)` and
+`draw()`;
+[`seq_to_canvas()`](http://andrewlynch.io/SeqPlotR/reference/seq_to_canvas.md)
+maps data values into any track's panel.
 
 ## Super class
 
-`SeqPlotR::SeqElement` -\> `SeqLink`
+`SeqElement` -\> `SeqLink`
 
 ## Public fields
 
@@ -36,35 +34,40 @@ fields.
 
   Synthetic point GRanges for anchor 1.
 
+- `anchor1_missing`:
+
+  Logical per row, set by `resolve()`: `TRUE` where `x1` or `chrom1` is
+  `NA` and anchor 1 falls back to anchor 0.
+
 ## Methods
 
 ### Public methods
 
-- [`SeqLinkR6$new()`](#method-SeqLink-new)
+- [`SeqLink$new()`](#method-SeqLink-initialize)
 
-- [`SeqLinkR6$resolve()`](#method-SeqLink-resolve)
+- [`SeqLink$resolve()`](#method-SeqLink-resolve)
 
-- [`SeqLinkR6$prep()`](#method-SeqLink-prep)
+- [`SeqLink$prep()`](#method-SeqLink-prep)
 
-- [`SeqLinkR6$.resolve_track_ref()`](#method-SeqLink-.resolve_track_ref)
+- [`SeqLink$.resolve_track_ref()`](#method-SeqLink-.resolve_track_ref)
 
-- [`SeqLinkR6$clone()`](#method-SeqLink-clone)
+- [`SeqLink$clone()`](#method-SeqLink-clone)
 
 Inherited methods
 
-- [`SeqPlotR::SeqElement$.infer_scale_y()`](http://andrewlynch.io/SeqPlotR/reference/SeqElement.html#method-.infer_scale_y)
-- [`SeqPlotR::SeqElement$collect_legend_keys()`](http://andrewlynch.io/SeqPlotR/reference/SeqElement.html#method-collect_legend_keys)
-- [`SeqPlotR::SeqElement$draw()`](http://andrewlynch.io/SeqPlotR/reference/SeqElement.html#method-draw)
+- `SeqElement$.infer_scale_y()`
+- `SeqElement$collect_legend_keys()`
+- `SeqElement$draw()`
 
 ------------------------------------------------------------------------
 
-### Method `new()`
+### `SeqLink$new()`
 
 Construct a new SeqLinkR6.
 
 #### Usage
 
-    SeqLinkR6$new(
+    SeqLink$new(
       data = NULL,
       mapping = NULL,
       t0 = NULL,
@@ -112,16 +115,17 @@ Construct a new SeqLinkR6.
 
 ------------------------------------------------------------------------
 
-### Method `resolve()`
+### `SeqLink$resolve()`
 
 Resolve the mapping against the effective `data`, then synthesise
 `anchor0_gr` and `anchor1_gr` from the resolved fields. Errors if `x0`
 or `x1` is missing, or if `chrom0`/`chrom1` cannot be derived (only
-auto-fillable for GRanges `data`).
+auto-fillable for GRanges `data`). Rows with an `NA` `x1` or `chrom1`
+take anchor 0 as anchor 1 and are flagged in `anchor1_missing`.
 
 #### Usage
 
-    SeqLinkR6$resolve(track_data = NULL, track_mapping = NULL)
+    SeqLink$resolve(track_data = NULL, track_mapping = NULL)
 
 #### Arguments
 
@@ -140,13 +144,13 @@ The link, invisibly.
 
 ------------------------------------------------------------------------
 
-### Method `prep()`
+### `SeqLink$prep()`
 
 Override in subclasses. Default implementation errors.
 
 #### Usage
 
-    SeqLinkR6$prep(layout_all_tracks, track_windows_list, plot_track_index = NULL)
+    SeqLink$prep(layout_all_tracks, track_windows_list, plot_track_index = NULL)
 
 #### Arguments
 
@@ -165,7 +169,7 @@ Override in subclasses. Default implementation errors.
 
 ------------------------------------------------------------------------
 
-### Method `.resolve_track_ref()`
+### `SeqLink$.resolve_track_ref()`
 
 Look up a track reference (`track_id` string or integer index) in
 `layout_all_tracks` and return its panel-bounds list. Errors with a
@@ -173,7 +177,7 @@ clear message when the reference cannot be resolved.
 
 #### Usage
 
-    SeqLinkR6$.resolve_track_ref(ref, layout_all_tracks)
+    SeqLink$.resolve_track_ref(ref, layout_all_tracks)
 
 #### Arguments
 
@@ -193,13 +197,13 @@ The selected track's panel-bounds list.
 
 ------------------------------------------------------------------------
 
-### Method `clone()`
+### `SeqLink$clone()`
 
 The objects of this class are cloneable with this method.
 
 #### Usage
 
-    SeqLinkR6$clone(deep = FALSE)
+    SeqLink$clone(deep = FALSE)
 
 #### Arguments
 

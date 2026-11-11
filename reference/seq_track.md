@@ -45,6 +45,7 @@ seq_track(
   elements = list(),
   show_legend = TRUE,
   window_scale = NULL,
+  x_span = NULL,
   ...
 )
 ```
@@ -194,6 +195,19 @@ seq_track(
   positionally; any other length triggers a warning and recycles with
   [`rep_len()`](https://rdrr.io/r/base/rep.html).
 
+- x_span:
+
+  `NULL` (default), a numeric `c(min, max)` or `"shared"`. When set,
+  each window is placed at its own coordinates on a common span instead
+  of filling the track width, so the gaps between windows follow their
+  coordinates and every track with the same span has the same
+  bp-per-width scale. `"shared"` uses the union of the windows of every
+  track in the plot with `x_span = "shared"`. The x plot range of each
+  window is its exact window range (no scale expansion). Window and
+  inner margins should be 0 for exact alignment across tracks. Cannot be
+  combined with `combine_windows`. Useful for pseudo-coordinate tracks
+  such as assembled or rearranged sequences drawn against a reference.
+
 - ...:
 
   Additional arguments reserved for future use.
@@ -247,6 +261,7 @@ seq_track(track_id = "A")
 #>     window_outer_margin: list
 #>     window_scale: NULL
 #>     windows: NULL
+#>     x_span: NULL
 #>     y_windows: NULL
 #>     y_windows2: NULL
 ```

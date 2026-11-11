@@ -103,4 +103,6 @@ seq_sequence(sequence = "ATCGATCGATCG", show_letters = TRUE)
 #>     sequence: ATCGATCGATCG
 #>     show_legend: TRUE
 #>     show_letters: TRUE
+#>     y_fields: y y_end y_min y_max y0 y1 height
+#>     y_transform: NULL
 ```

@@ -59,6 +59,8 @@ seq_point(map(x = start, y = score))
 #>     resolve: function (track_data = NULL, track_mapping = NULL) 
 #>     resolved: NULL
 #>     show_legend: TRUE
+#>     y_fields: y y_end y_min y_max y0 y1 height
+#>     y_transform: NULL
 seq_point(map(x = start, y = score, color = type))  # auto-legend
 #> <SeqPoint>
 #>   Inherits from: <SeqElement>
@@ -78,4 +80,6 @@ seq_point(map(x = start, y = score, color = type))  # auto-legend
 #>     resolve: function (track_data = NULL, track_mapping = NULL) 
 #>     resolved: NULL
 #>     show_legend: TRUE
+#>     y_fields: y y_end y_min y_max y0 y1 height
+#>     y_transform: NULL
 ```

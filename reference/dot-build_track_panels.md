@@ -7,7 +7,16 @@ fields. Used by both layout builders.
 ## Usage
 
 ``` r
-.build_track_panels(track, x0, x1, y0, y1, window_gap, track_key)
+.build_track_panels(
+  track,
+  x0,
+  x1,
+  y0,
+  y1,
+  window_gap,
+  track_key,
+  shared_x_span = NULL
+)
 ```
 
 ## Arguments
@@ -32,6 +41,11 @@ fields. Used by both layout builders.
 
   The value to store in each panel's `track` field — integer index in
   positional mode, `track_id` string in patchwork mode.
+
+- shared_x_span:
+
+  Numeric `c(min, max)` used by tracks with `x_span = "shared"`, or
+  `NULL`.
 
 ## Value
 

@@ -1,23 +1,19 @@
 # SeqArch R6 class
 
-SeqArch R6 class
-
-SeqArch R6 class
-
-## Details
-
-Internal R6 generator backing
-[`seq_arch()`](http://andrewlynch.io/SeqPlotR/reference/seq_arch.md).
+R6 generator backing
+[`seq_arch()`](http://andrewlynch.io/SeqPlotR/reference/seq_arch.md),
+exported for subclassing (for example
+[`seq_cross_arch()`](http://andrewlynch.io/SeqPlotR/reference/seq_cross_arch.md)).
 Inherits from
 [`SeqLinkR6`](http://andrewlynch.io/SeqPlotR/reference/SeqLinkR6.md).
 Same anchor pattern as
-[`SeqArcR6`](http://andrewlynch.io/SeqPlotR/reference/SeqArcR6.md) but
+[`seq_arc()`](http://andrewlynch.io/SeqPlotR/reference/seq_arc.md) but
 draws full vertical stems from the baseline to the arch endpoints and
 renders partial-window stubs when only one anchor is visible.
 
 ## Super classes
 
-`SeqPlotR::SeqElement` -\> `SeqPlotR::SeqLink` -\> `SeqArch`
+`SeqElement` -\> `SeqLink` -\> `SeqArch`
 
 ## Public fields
 
@@ -30,30 +26,30 @@ renders partial-window stubs when only one anchor is visible.
 
 ### Public methods
 
-- [`SeqArchR6$new()`](#method-SeqArch-new)
+- [`SeqArch$new()`](#method-SeqArch-initialize)
 
-- [`SeqArchR6$prep()`](#method-SeqArch-prep)
+- [`SeqArch$prep()`](#method-SeqArch-prep)
 
-- [`SeqArchR6$draw()`](#method-SeqArch-draw)
+- [`SeqArch$draw()`](#method-SeqArch-draw)
 
-- [`SeqArchR6$clone()`](#method-SeqArch-clone)
+- [`SeqArch$clone()`](#method-SeqArch-clone)
 
 Inherited methods
 
-- [`SeqPlotR::SeqElement$.infer_scale_y()`](http://andrewlynch.io/SeqPlotR/reference/SeqElement.html#method-.infer_scale_y)
-- [`SeqPlotR::SeqElement$collect_legend_keys()`](http://andrewlynch.io/SeqPlotR/reference/SeqElement.html#method-collect_legend_keys)
-- [`SeqPlotR::SeqLink$.resolve_track_ref()`](http://andrewlynch.io/SeqPlotR/reference/SeqLink.html#method-.resolve_track_ref)
-- [`SeqPlotR::SeqLink$resolve()`](http://andrewlynch.io/SeqPlotR/reference/SeqLink.html#method-resolve)
+- `SeqElement$.infer_scale_y()`
+- `SeqElement$collect_legend_keys()`
+- `SeqLink$.resolve_track_ref()`
+- `SeqLink$resolve()`
 
 ------------------------------------------------------------------------
 
-### Method `new()`
+### `SeqArch$new()`
 
 Construct a SeqArchR6.
 
 #### Usage
 
-    SeqArchR6$new(
+    SeqArch$new(
       data = NULL,
       mapping = NULL,
       t0 = NULL,
@@ -91,7 +87,7 @@ Construct a SeqArchR6.
 
 ------------------------------------------------------------------------
 
-### Method `prep()`
+### `SeqArch$prep()`
 
 Resolve both anchors against their referenced tracks, assign each anchor
 to a window via `findOverlaps()`, and build `coordCanvas` for
@@ -99,7 +95,7 @@ fully-visible links plus `stubs` for half-visible links.
 
 #### Usage
 
-    SeqArchR6$prep(layout_all_tracks, track_windows_list, plot_track_index = NULL)
+    SeqArch$prep(layout_all_tracks, track_windows_list, plot_track_index = NULL)
 
 #### Arguments
 
@@ -118,24 +114,24 @@ fully-visible links plus `stubs` for half-visible links.
 
 ------------------------------------------------------------------------
 
-### Method `draw()`
+### `SeqArch$draw()`
 
 Draw arches with stems, then partial-window stubs (when
 `aes(plotStubs = TRUE)`).
 
 #### Usage
 
-    SeqArchR6$draw()
+    SeqArch$draw()
 
 ------------------------------------------------------------------------
 
-### Method `clone()`
+### `SeqArch$clone()`
 
 The objects of this class are cloneable with this method.
 
 #### Usage
 
-    SeqArchR6$clone(deep = FALSE)
+    SeqArch$clone(deep = FALSE)
 
 #### Arguments
 

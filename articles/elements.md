@@ -1,13 +1,12 @@
-# SeqPlotR Elements: Primitives, Composites, and Ideograms
+# Elements: Primitives, Composites, and Ideograms
 
-This vignette is a visual catalogue of every drawable in SeqPlotR —
-every primitive (`seq_point`, `seq_line`, `seq_segment`, `seq_curve`,
-`seq_path`, `seq_poly`, `seq_area`, `seq_text`), every composite
-(`seq_bar`, `seq_ribbon`, `seq_density`, `seq_tile`, `seq_lollipop`,
-`seq_gene`, `seq_sequence`), and the ideogram (`seq_ideogram`). The
-later sections stitch them together with multi-region windows and a
-patchwork layout so you can see what a realistic mixed browser track
-looks like.
+A visual catalogue of every drawable in SeqPlotR: primitives
+(`seq_point`, `seq_line`, `seq_segment`, `seq_curve`, `seq_path`,
+`seq_poly`, `seq_area`, `seq_text`), composites (`seq_bar`,
+`seq_ribbon`, `seq_density`, `seq_tile`, `seq_lollipop`, `seq_gene`,
+`seq_sequence`), the ideogram, and the scalebar. Windows, margins and
+layouts are covered in
+[`vignette("layouts")`](http://andrewlynch.io/SeqPlotR/articles/layouts.md).
 
 ``` r
 
@@ -52,13 +51,44 @@ library(GenomicRanges)
 #> Loading required package: IRanges
 #> Loading required package: Seqinfo
 
-# Two genomic regions, used throughout for multi-window demos.
-multi_win <- GRanges("chr1",
-  IRanges(start = c(1.0e6, 5.0e6),
-          end   = c(3.0e6, 6.5e6)))
-
-# Single-window convenience for the small element demos.
+# single window used for most demos
 win <- GRanges("chr1", IRanges(1e6, 3e6))
+```
+
+Several examples use simulated tumour data shipped with the package: a
+BFB amplicon on chr2 (`bfb`), whole-genome doubling on chr1-3 (`wgd`),
+chromothripsis on chr3 (`ct`) and chromothripsis with BFB on chr4
+(`ct_bfb`). Each scenario has copy-number segments, SVs and SNVs with a
+variant allele fraction (VAF).
+
+``` r
+
+sim <- function(sc, f) {
+  utils::read.delim(system.file("extdata", "sim", sc, f, package = "SeqPlotR"))
+}
+seg_to_gr <- function(d) {
+  GRanges(d$chrom, IRanges(d$start, d$end),
+          cn = d$cn, cn_major = d$cn_major, cn_minor = d$cn_minor, baf = d$baf)
+}
+snv_to_gr <- function(d) {
+  GRanges(d$chrom, IRanges(d$pos, width = 1),
+          vaf = d$vaf, sbs6 = d$sbs6, mult = as.character(d$truth_mult))
+}
+
+bfb_snv <- snv_to_gr(sim("bfb", "snvs.tsv"))
+bfb_seg <- seg_to_gr(sim("bfb", "segments.tsv"))
+bfb_win <- GRanges("chr2", IRanges(1.75e8, 2.05e8))
+
+wgd_snv <- snv_to_gr(sim("wgd", "snvs.tsv"))
+
+ct_seg  <- seg_to_gr(sim("ct", "segments.tsv"))
+ct_win  <- GRanges("chr3", IRanges(9.5e7, 1.95e8))
+
+ctb_seg <- seg_to_gr(sim("ct_bfb", "segments.tsv"))
+ctb_sv  <- sim("ct_bfb", "svs.tsv")
+ctb_sv  <- GRanges(ctb_sv$chrom1, IRanges(ctb_sv$pos1, width = 1),
+                   jcn = ctb_sv$jcn, sv_type = ctb_sv$sv_type)
+ctb_win <- GRanges("chr4", IRanges(5.8e7, 1.24e8))
 ```
 
 ## Primitives
@@ -77,19 +107,19 @@ can host several primitives drawing from the same table.
 Required [`map()`](http://andrewlynch.io/SeqPlotR/reference/map.md)
 fields: `x`, `y`. Optional: `color`, `fill`, `size`, `shape`, `alpha`.
 
+Below, each SNV from a simulated BFB amplicon on chr2 is a point at its
+position, with VAF on `y`, coloured by the true number of mutated copies
+(`mult`). SNVs inside the amplified region carry several copies.
+
 ``` r
 
-xs       <- seq(1.05e6, 2.95e6, length.out = 40)
-point_gr <- GRanges("chr1", IRanges(xs, width = 1),
-                    score = sin((xs - 1e6) / 5e5) + rnorm(40, 0, 0.12),
-                    cat   = sample(c("A", "B", "C"), 40, replace = TRUE))
-
-seq_plot() %|%
-  seq_track(data = point_gr,
-            mapping = map(x = start, y = score),
-            windows = win) %+%
-  seq_point(map(color = cat),
-            aesthetics = aes(size = 0.7, alpha = 0.9)) -> p
+seq_plot(aesthetics = aes(margins = list(top = 0, right = 0.12,
+                                         bottom = 0, left = 0))) %|%
+  seq_track(data = bfb_snv,
+            mapping = map(x = start, y = vaf),
+            windows = bfb_win) %+%
+  seq_point(map(color = mult),
+            aesthetics = aes(size = 0.5, alpha = 0.8)) -> p
 p$plot()
 ```
 
@@ -100,27 +130,37 @@ p$plot()
 Required: `x`, `y`. `aes(type = "step")` switches to a step line (useful
 for signal tracks that represent piecewise-constant values).
 
+Below, the simulated BFB amplicon on chr2 is shown as the mean SNV VAF
+in 1 Mb bins (smooth) and as the piecewise-constant copy number of each
+segment (step). Both rise across the amplified region.
+
 ``` r
 
-line_xs <- seq(1.05e6, 2.95e6, length.out = 100)
-line_gr <- GRanges("chr1", IRanges(line_xs, width = 1),
-                   signal = sin((line_xs - 1e6) / 3e5) * 0.4 + 0.5,
-                   step   = round(sin((line_xs - 1e6) / 3e5) * 2) / 4 + 0.5)
+bfb_win_snv <- subsetByOverlaps(bfb_snv, bfb_win)
+bin_start   <- seq(start(bfb_win), end(bfb_win) - 1e6, by = 1e6)
+bin_id      <- factor(findInterval(start(bfb_win_snv), bin_start), seq_along(bin_start))
+bfb_bins    <- GRanges("chr2", IRanges(bin_start + 5e5, width = 1),
+                       mean_vaf = as.vector(tapply(bfb_win_snv$vaf, bin_id, mean)),
+                       n_snv    = as.vector(table(bin_id)))
+```
+
+``` r
 
 seq_plot() %|%
-  seq_track(track_id = "Smooth",
-            data = line_gr,
-            mapping = map(x = start, y = signal),
-            windows = win) %+%
-  seq_line(aesthetics = aes(color = "#205EA6", linewidth = 1.4)) %|%
-  seq_track(track_id = "Step",
-            data = line_gr,
-            mapping = map(x = start, y = step),
-            windows = win) %+%
+  seq_track(track_id = "Mean VAF",
+            data = bfb_bins,
+            mapping = map(x = start, y = mean_vaf),
+            windows = bfb_win) %+%
+  seq_line(aesthetics = aes(color = "#205EA6", linewidth = 1.4)) %__%
+  seq_track(track_id = "Copy number",
+            data = bfb_seg,
+            mapping = map(x = start, y = cn),
+            windows = bfb_win) %+%
   seq_line(aesthetics = aes(color = "#AF3029",
                             linewidth = 1.4,
                             type = "step")) -> p
 p$plot()
+#> 1 out-of-bounds data points excluded! (seq_line)
 ```
 
 ![](elements_files/figure-html/line-1.png)
@@ -128,23 +168,19 @@ p$plot()
 ### `seq_segment` — one straight line per row
 
 Required: `x`, `x_end`, `y`, `y_end`. Great for quick interval marks — a
-peak span, a read pair, a Manhattan-style baseline.
+peak span, a read pair, a Manhattan-style baseline. Below, each
+copy-number segment of a simulated chromothripsis event on chr3 is a
+horizontal line at its total copy number; the oscillation between CN 3
+and CN 1 is the chromothripsis signature.
 
 ``` r
 
-seg_gr <- GRanges("chr1",
-  IRanges(start = seq(1.1e6, 2.9e6, by = 2.5e5), width = 1),
-  x_end = seq(1.1e6, 2.9e6, by = 2.5e5) + 1.5e5,
-  y     = runif(8, 0.2, 0.6),
-  y_end = runif(8, 0.4, 0.9),
-  grp   = rep(c("up", "down"), length.out = 8))
-
 seq_plot() %|%
-  seq_track(data = seg_gr,
-            mapping = map(x = start, x_end = x_end,
-                          y = y, y_end = y_end, color = grp),
-            windows = win) %+%
-  seq_segment(aesthetics = aes(linewidth = 2, alpha = 0.85)) -> p
+  seq_track(data = ct_seg,
+            mapping = map(x = start, x_end = end,
+                          y = cn, y_end = cn),
+            windows = ct_win) %+%
+  seq_segment(aesthetics = aes(linewidth = 3, color = "#205EA6")) -> p
 p$plot()
 ```
 
@@ -239,17 +275,15 @@ p$plot()
 Required: `x`, `y`. Optional `aes(baseline = ...)` sets the closing
 y-value (default `0`). Coverage curves, pileups, smoothed density fills.
 
+Below, the number of SNVs per 1 Mb bin of the simulated BFB amplicon on
+chr2; mutation counts climb with copy number.
+
 ``` r
 
-area_xs <- seq(1.05e6, 2.95e6, length.out = 80)
-area_gr <- GRanges("chr1", IRanges(area_xs, width = 1),
-                   depth = 0.5 + 0.3 * sin((area_xs - 1e6) / 4e5) +
-                           rnorm(80, 0, 0.02))
-
 seq_plot() %|%
-  seq_track(data = area_gr,
-            mapping = map(x = start, y = depth),
-            windows = win) %+%
+  seq_track(data = bfb_bins,
+            mapping = map(x = start, y = n_snv),
+            windows = bfb_win) %+%
   seq_area(aesthetics = aes(fill = "#4385BE",
                             color = "#205EA6",
                             alpha = 0.65,
@@ -293,42 +327,70 @@ from its underlying primitive and exposes a narrower, task-specific
 ### `seq_bar` — per-interval rectangles
 
 One rectangle per observation; `group` stacks bars at identical x
-positions.
+positions. Below, each segment of a simulated chromothripsis and BFB
+event on chr4 is a bar spanning the segment, with height equal to its
+copy number.
 
 ``` r
 
-bar_gr <- GRanges("chr1",
-  IRanges(start = seq(1.1e6, 2.9e6, by = 2e5), width = 8e4),
-  score = runif(10, 0.2, 1.0))
-
 seq_plot() %|%
-  seq_track(data = bar_gr,
-            mapping = map(x = start, y = score),
-            windows = win) %+%
+  seq_track(data = ctb_seg,
+            mapping = map(x = start, y = cn),
+            windows = ctb_win,
+            scale_y = seq_scale_continuous(limits = c(0, 6))) %+%
   seq_bar(aesthetics = aes(fill = "#4385BE")) -> p
 p$plot()
 ```
 
 ![](elements_files/figure-html/bar-1.png)
 
-### `seq_ribbon` — band between two y series
+#### Stacked bars
 
-Required: `y_min`, `y_max`. Confidence bands, min/max pileups, CI
-envelopes — anything that needs a shaded interval per x.
+Supplying a `group` mapping causes bars at identical x positions to
+stack. Colors are drawn from the Flexoki palette keyed on group level.
 
 ``` r
 
-ribbon_xs <- seq(1.05e6, 2.95e6, length.out = 60)
-ribbon_mu <- sin((ribbon_xs - 1e6) / 3e5) * 0.3 + 0.5
-ribbon_gr <- GRanges("chr1", IRanges(ribbon_xs, width = 1),
-                     mean = ribbon_mu,
-                     lo   = ribbon_mu - 0.12,
-                     hi   = ribbon_mu + 0.12)
+stack_gr <- GRanges(
+  "chr1",
+  IRanges(start = rep(seq(1.2e6, 2.8e6, by = 2e5), each = 3), width = 5e4),
+  value    = runif(27, 0.1, 0.5),
+  category = rep(c("A", "B", "C"), times = 9)
+)
 
 seq_plot() %|%
-  seq_track(data = ribbon_gr,
-            mapping = map(x = start, y_min = lo, y_max = hi),
+  seq_track(data = stack_gr,
+            mapping = map(x = start, y = value, group = category),
             windows = win) %+%
+  seq_bar() -> p
+p$plot()
+#> 8 out-of-bounds data points excluded! (seq_bar)
+```
+
+![](elements_files/figure-html/bar-stacked-1.png)
+
+### `seq_ribbon` — band between two y series
+
+Required: `y_min`, `y_max`. Confidence bands, min/max pileups, CI
+envelopes — anything that needs a shaded interval per x. Below, the band
+between the minor and major allele copy number of the simulated chr4
+event; the band collapses to zero width in balanced segments and sits on
+the major allele where the minor allele is lost.
+
+``` r
+
+# one point at each segment edge so the band is piecewise constant
+ctb_edges <- GRanges("chr4",
+  IRanges(c(start(ctb_seg), end(ctb_seg)), width = 1),
+  cn_minor = rep(ctb_seg$cn_minor, 2),
+  cn_major = rep(ctb_seg$cn_major, 2))
+ctb_edges <- sort(ctb_edges)
+
+seq_plot() %|%
+  seq_track(data = ctb_edges,
+            mapping = map(x = start, y_min = cn_minor, y_max = cn_major),
+            windows = ctb_win,
+            scale_y = seq_scale_continuous(limits = c(0, 3))) %+%
   seq_ribbon(aesthetics = aes(fill = "#4385BE", alpha = 0.5)) -> p
 p$plot()
 ```
@@ -341,20 +403,22 @@ Calls [`stats::density()`](https://rdrr.io/r/stats/density.html) on the
 resolved `y` and renders the result as a filled area. Pre-computed
 densities should use
 [`seq_area()`](http://andrewlynch.io/SeqPlotR/reference/seq_area.md)
-directly.
+directly. Below, the VAF of SNVs from a simulated whole-genome-doubling
+tumour on chr1-3. The density runs along the x-axis (VAF, 0 to 1) and
+`bw` sets the bandwidth; the modes come from SNVs carried by one, two or
+four copies.
 
 ``` r
 
-dens_gr <- GRanges("chr1",
-  IRanges(start = seq(1e6, 3e6, length.out = 200), width = 1),
-  score = c(rnorm(120, mean = 0.3, sd = 0.05),
-            rnorm(80,  mean = 0.7, sd = 0.08)))
-
 seq_plot() %|%
-  seq_track(data = dens_gr,
-            mapping = map(x = start, y = score),
-            windows = win) %+%
-  seq_density(aesthetics = aes(fill = "#879A39", alpha = 0.7)) -> p
+  seq_track(data = wgd_snv,
+            mapping = map(x = start, y = vaf),
+            windows = GRanges("chr1", IRanges(1, 248956422)),
+            scale_x = seq_scale_continuous(limits = c(0, 1)),
+            scale_y = seq_scale_continuous(limits = c(0, 1)),
+            aesthetics = aes("axis.y1.visible" = FALSE,
+                                "axis.x1.title.text" = "VAF")) %+%
+  seq_density(aesthetics = aes(fill = "#879A39", alpha = 0.7, bw = 0.02)) -> p
 p$plot()
 ```
 
@@ -362,43 +426,82 @@ p$plot()
 
 ### `seq_tile` — rectangles per interval
 
-Flat mode: one rectangle per observation. Rotated mode
-(`aes(rotate = TRUE)`) turns each tile into a diamond — the standard
-Hi-C representation when combined with a genomic y-axis (see the
-`basics` vignette for a full example).
+Flat mode: one rectangle per observation, here one tile per segment of
+the simulated chr4 event, shaded by the B-allele frequency (`baf`; 0.5
+is balanced, 1 is LOH). Rotated mode (`aes(rotate = TRUE)`) turns each
+tile into a diamond, the standard Hi-C representation when combined with
+a genomic y-axis (see below).
 
 ``` r
 
-tile_gr <- GRanges("chr1",
-  IRanges(start = seq(1.1e6, 2.9e6, by = 1e5), width = 8e4),
-  fill_col = sample(flexoki_palette(5), 19, replace = TRUE))
+baf_ramp <- grDevices::colorRampPalette(c("#DAD8CE", "#205EA6"))(100)
+ctb_seg$baf_col <- baf_ramp[round((ctb_seg$baf - 0.5) / 0.5 * 99) + 1]
 
 seq_plot() %|%
-  seq_track(data = tile_gr,
-            mapping = map(x = start, fill = fill_col),
-            windows = win) %+%
+  seq_track(data = ctb_seg,
+            mapping = map(x = start, fill = baf_col),
+            windows = ctb_win) %+%
   seq_tile() -> p
 p$plot()
 ```
 
 ![](elements_files/figure-html/tile-1.png)
 
+#### Rotated tiles
+
+Rotated tiles (`aes(rotate = TRUE)`) place each observation as a diamond
+in `(genomic_x, genomic_y)` space — the natural representation for Hi-C
+contacts or any 2D genomic relationship. Both axes are genomic; pass a
+[`seq_scale_genomic()`](http://andrewlynch.io/SeqPlotR/reference/seq_scale_genomic.md)
+`scale_y` built from the distance-bin `GRanges`.
+
+``` r
+
+n_contacts <- 60
+hic_win <- GRanges("chr1", IRanges(1e6, 3e6))
+
+# Toy Hi-C: pick x-bins, then y-bins offset by a genomic distance.
+x_starts <- sample(seq(1.05e6, 2.95e6, by = 2e4), n_contacts, replace = TRUE)
+y_offset <- sample(seq(2e4, 8e5, by = 2e4), n_contacts, replace = TRUE)
+
+x_gr <- GRanges("chr1", IRanges(start = x_starts,            width = 2e4),
+                score = runif(n_contacts))
+y_gr <- GRanges("chr1", IRanges(start = x_starts + y_offset, width = 2e4))
+
+# Map [0,1] scores → a soft red ramp for the fill column.
+score_to_color <- function(s) {
+  pal <- grDevices::colorRampPalette(c("#F4A4C2", "#A02C6D"))(100)
+  pal[pmin(pmax(round(s * 99) + 1, 1), 100)]
+}
+x_gr$fill_col <- score_to_color(x_gr$score)
+
+seq_plot() %|%
+  seq_track(data = x_gr,
+            mapping = map(x = start, fill = fill_col),
+            windows = hic_win,
+            scale_y = seq_scale_genomic(
+              GRanges("chr1", IRanges(0, max(y_offset) + 2e4)))) %+%
+  seq_tile(data2 = y_gr, aesthetics = aes(rotate = TRUE)) -> p
+p$plot()
+```
+
+![](elements_files/figure-html/tile-rotated-1.png)
+
 ### `seq_lollipop` — stem + point
 
 Vertical stem from `baseline` (default `0`) up to `y`, with a point at
 `y`. Standard for sparse discrete events (mutation impact, peak
-summits).
+summits). Below, the junctions of the simulated chr4 event, placed at
+their first breakpoint with height equal to the junction copy number
+(`jcn`).
 
 ``` r
 
-lp_gr <- GRanges("chr1",
-  IRanges(start = sample(seq(1.05e6, 2.95e6, by = 1e4), 15), width = 1),
-  impact = runif(15, 0.2, 1.0))
-
 seq_plot() %|%
-  seq_track(data = lp_gr,
-            mapping = map(x = start, y = impact),
-            windows = win) %+%
+  seq_track(data = ctb_sv,
+            mapping = map(x = start, y = jcn),
+            windows = ctb_win,
+            scale_y = seq_scale_continuous(limits = c(0, 5.5))) %+%
   seq_lollipop(aesthetics = aes(color = "#AF3029", linewidth = 1.2)) -> p
 p$plot()
 ```
@@ -414,6 +517,10 @@ distinguishes exons from UTRs, `label` places the gene name, `color`
 tints each gene.
 
 ``` r
+
+# reused by the gene examples below
+gm <- map(group = gene_id, type = feature, strand = strand_col,
+          label = gene_name, color = color)
 
 gene_gr <- GRanges("chr1",
   IRanges(
@@ -436,17 +543,9 @@ gene_gr <- GRanges("chr1",
 
 seq_plot() %|%
   seq_track(data = gene_gr,
-            mapping = map(group  = gene_id,
-                          type   = feature,
-                          strand = strand_col,
-                          label  = gene_name,
-                          color  = color),
+            mapping = gm,
             windows = win) %+%
-  seq_gene(map(group  = gene_id,
-               type   = feature,
-               strand = strand_col,
-               label  = gene_name,
-               color  = color)) -> p
+  seq_gene(gm) -> p
 p$plot()
 ```
 
@@ -463,17 +562,9 @@ or low-confidence models.
 
 seq_plot() %|%
   seq_track(data = gene_gr,
-            mapping = map(group  = gene_id,
-                          type   = feature,
-                          strand = strand_col,
-                          label  = gene_name,
-                          color  = color),
+            mapping = gm,
             windows = win) %+%
-  seq_gene(map(group  = gene_id,
-               type   = feature,
-               strand = strand_col,
-               label  = gene_name,
-               color  = color),
+  seq_gene(gm,
            backbone_type = "dashed") -> p
 p$plot()
 ```
@@ -491,17 +582,9 @@ to override the auto-detected position per gene.
 
 seq_plot() %|%
   seq_track(data = gene_gr,
-            mapping = map(group  = gene_id,
-                          type   = feature,
-                          strand = strand_col,
-                          label  = gene_name,
-                          color  = color),
+            mapping = gm,
             windows = win) %+%
-  seq_gene(map(group  = gene_id,
-               type   = feature,
-               strand = strand_col,
-               label  = gene_name,
-               color  = color),
+  seq_gene(gm,
            show_start = TRUE) -> p
 p$plot()
 ```
@@ -519,17 +602,9 @@ is labelled. Silently ignored when only one strand is present.
 
 seq_plot() %|%
   seq_track(data = gene_gr,
-            mapping = map(group  = gene_id,
-                          type   = feature,
-                          strand = strand_col,
-                          label  = gene_name,
-                          color  = color),
+            mapping = gm,
             windows = win) %+%
-  seq_gene(map(group  = gene_id,
-               type   = feature,
-               strand = strand_col,
-               label  = gene_name,
-               color  = color),
+  seq_gene(gm,
            separate_strands = TRUE) -> p
 p$plot()
 ```
@@ -546,18 +621,10 @@ the track already conveys directionality through the strand band layout.
 
 seq_plot() %|%
   seq_track(data = gene_gr,
-            mapping = map(group  = gene_id,
-                          type   = feature,
-                          strand = strand_col,
-                          label  = gene_name,
-                          color  = color),
+            mapping = gm,
             windows = win,
             track_height = 1.2) %+%
-  seq_gene(map(group  = gene_id,
-               type   = feature,
-               strand = strand_col,
-               label  = gene_name,
-               color  = color),
+  seq_gene(gm,
            backbone_type    = "solid",
            show_start       = TRUE,
            separate_strands = TRUE) -> p
@@ -579,38 +646,9 @@ for very dense overviews. Labels are drawn in all three modes.
 
 seq_plot() %|%
   seq_track(data = gene_gr,
-            mapping = map(group  = gene_id,
-                          type   = feature,
-                          strand = strand_col,
-                          label  = gene_name,
-                          color  = color),
+            mapping = gm,
             windows = win) %+%
-  seq_gene(map(group  = gene_id,
-               type   = feature,
-               strand = strand_col,
-               label  = gene_name,
-               color  = color),
-           style_type = "exon") -> p
-p$plot()
-```
-
-![](elements_files/figure-html/gene-style-exon-1.png)
-
-``` r
-
-seq_plot() %|%
-  seq_track(data = gene_gr,
-            mapping = map(group  = gene_id,
-                          type   = feature,
-                          strand = strand_col,
-                          label  = gene_name,
-                          color  = color),
-            windows = win) %+%
-  seq_gene(map(group  = gene_id,
-               type   = feature,
-               strand = strand_col,
-               label  = gene_name,
-               color  = color),
+  seq_gene(gm,
            style_type = "gene") -> p
 p$plot()
 ```
@@ -621,22 +659,48 @@ p$plot()
 
 seq_plot() %|%
   seq_track(data = gene_gr,
-            mapping = map(group  = gene_id,
-                          type   = feature,
-                          strand = strand_col,
-                          label  = gene_name,
-                          color  = color),
+            mapping = gm,
             windows = win) %+%
-  seq_gene(map(group  = gene_id,
-               type   = feature,
-               strand = strand_col,
-               label  = gene_name,
-               color  = color),
+  seq_gene(gm,
            style_type = "point") -> p
 p$plot()
 ```
 
 ![](elements_files/figure-html/gene-style-point-1.png)
+
+#### Label placement
+
+`aes(gene.label = aes(position = c(<"start"|"end">, <"top"|"bottom">)))`
+composes label placement independently on x and y.
+
+``` r
+
+gr_genes <- GRanges("chr1",
+  IRanges(start = c(100,  400, 1000, 1500),
+          end   = c(300,  600, 1200, 1700)),
+  gene_id    = c("geneA", "geneA", "geneB", "geneB"),
+  gene_name  = c("GeneA", "GeneA", "GeneB", "GeneB"),
+  strand_col = c("+", "+", "-", "-"),
+  feat_type  = c("exon", "exon", "exon", "exon")
+)
+
+win_g <- GRanges("chr1", IRanges(1, 2000))
+
+p <- seq_plot() %+%
+  (seq_track(data = gr_genes, windows = win_g) %+%
+   seq_gene(
+     map(group = gene_id, label = gene_name,
+         strand = strand_col, type = feat_type),
+     aesthetics = aes(
+       gene.label = aes(position = c("start", "top"),
+                        color    = "navy",
+                        size     = 0.55)
+     )
+   ))
+p$plot()
+```
+
+![](elements_files/figure-html/gene-labels-1.png)
 
 #### Dense dataset — tier stacking
 
@@ -665,18 +729,10 @@ dense_gr <- GRanges("chr1",
 
 seq_plot() %|%
   seq_track(data = dense_gr,
-            mapping = map(group  = gene_id,
-                          type   = feature,
-                          strand = strand_col,
-                          label  = gene_name,
-                          color  = color),
+            mapping = gm,
             windows = win,
             track_height = 1.4) %+%
-  seq_gene(map(group  = gene_id,
-               type   = feature,
-               strand = strand_col,
-               label  = gene_name,
-               color  = color),
+  seq_gene(gm,
            separate_strands = TRUE) -> p
 p$plot()
 ```
@@ -828,219 +884,178 @@ p$plot()
 
 ![](elements_files/figure-html/ideogram-multi-1.png)
 
-## Multi-region windows
+### Scope and style
 
-A multi-range `windows` GRanges lays every range out as a separate panel
-inside a single track. Mappings resolve per-panel, so the same element
-draws independently on each region. Below: two non-adjacent regions on
-chr1 rendered as side-by-side panels.
+`scope = "full"` renders the whole chromosome and overlays a translucent
+box marking `highlight_range`. `style = "rounded"` adds rounded telomere
+caps; `telomere.radius = 1` gives a full half-circle.
 
 ``` r
 
-starts_A <- seq(1.1e6, 2.9e6, length.out = 12)
-starts_B <- seq(5.1e6, 6.4e6, length.out = 12)
+cb <- load_cytobands()
+chr1_full <- GRanges("chr1", IRanges(1, 248956422))
+zoom_in   <- GRanges("chr1", IRanges(1.2e8, 1.6e8))
 
-multi_gr <- GRanges("chr1",
-  IRanges(start = c(starts_A, starts_B), width = 5e4),
-  score  = runif(24, 0.2, 1.0),
-  region = rep(c("A", "B"), each = 12))
-
-seq_plot() %|%
-  seq_track(data = multi_gr,
-            mapping = map(x = start, y = score, group = region),
-            windows = multi_win) %+%
-  seq_bar() -> p
+p <- seq_plot() %+%
+  seq_track(windows = zoom_in, height = 1.5) %+%
+   seq_ideogram(cb,
+                scope           = "full",
+                style           = "rounded",
+                highlight_range = zoom_in,
+                aesthetics = aes(
+                  highlight       = aes(fill = "red", alpha = 0.5),
+                  telomere.radius = 1
+                ))
 p$plot()
 ```
 
-![](elements_files/figure-html/multi-window-1.png)
+![](elements_files/figure-html/ideogram-1.png)
 
-Windows can carry per-panel `scale` mcols to bias their relative widths
-— e.g. a 1 Mb region next to a 100 kb region shown at the same panel
-width so the smaller region is legible:
+## `seq_scalebar` — length reference
+
+[`seq_scalebar()`](http://andrewlynch.io/SeqPlotR/reference/seq_scalebar.md)
+draws a horizontal length reference at a panel position, useful when the
+x-axis is hidden. The label auto-formats from the length (`1e5` is
+`"100 kb"`, `2e6` is `"2 Mb"`, `500` is `"500 bp"`); override with
+`label = "..."`.
 
 ``` r
 
-scaled_win <- GRanges("chr1",
-  IRanges(start = c(1.0e6, 5.0e6), end = c(3.0e6, 5.1e6)))
-mcols(scaled_win)$scale <- c(1e-6, 1e-5)
+win_sb <- GRanges("chr1", IRanges(1, 1e6))
 
-starts_C <- seq(1.1e6, 2.9e6, length.out = 12)
-starts_D <- seq(5.01e6, 5.09e6, length.out = 12)
-scaled_gr <- GRanges("chr1",
-  IRanges(start = c(starts_C, starts_D), width = 2e4),
-  score  = runif(24, 0.2, 1.0))
-
-seq_plot() %|%
-  seq_track(data = scaled_gr,
-            mapping = map(x = start, y = score),
-            windows = scaled_win) %+%
-  seq_lollipop(aesthetics = aes(color = "#AF3029")) -> p
+p <- seq_plot() %+%
+  (seq_track(
+     windows    = win_sb,
+     aesthetics = aes("axis.x1.visible" = FALSE)) %+%
+   seq_scalebar(length_bp = 1e5,
+                hjust     = 0.95,
+                vjust     = 0.5,
+                bar_lwd   = 1.5))
 p$plot()
 ```
 
-![](elements_files/figure-html/multi-window-scaled-1.png)
+![](elements_files/figure-html/scalebar-1.png)
 
-## Complex layout — patchwork browser
+## Flipping the axes
 
-`seq_plot(layout = "...")` accepts a patchwork string where each non-`#`
-letter is a `track_id`-addressed cell. The example below lays out a
-six-track genome browser on two regions: an ideogram strip across the
-top, a signal ribbon + density sidebar on the next row, a bar track and
-a lollipop track in the middle, and gene models spanning the full width
-of the bottom row.
+By default every `seq_track` runs **genomic x** along its width and lets
+elements choose the y-axis scale from their data. Pass
+`scale_y = seq_scale_genomic(...)` to flip the track so genomic position
+runs along **y** instead; then set `scale_x = seq_scale_continuous(...)`
+(or `seq_scale_discrete(...)`) to carry a scalar / categorical value on
+the x-axis. The same data can be rendered either way.
 
-[`seq_preview_layout()`](http://andrewlynch.io/SeqPlotR/reference/seq_preview_layout.md)
-shows the geometry up-front — no data required — so you can iterate the
-string independently of the element code.
+[`seq_track()`](http://andrewlynch.io/SeqPlotR/reference/seq_track.md)
+exposes three arguments that drive this:
+
+- `scale_x` — controls the x-axis scale (defaults to the genomic range
+  of the track’s `windows`).
+- `scale_y` — controls the y-axis scale. `seq_scale_genomic(...)`
+  auto-enables `uses_genomic_y`.
+- `y_windows` — shorthand to set a genomic y-range without constructing
+  a scale object.
+
+### Same gene set, two orientations
+
+A small gene-level table (`log2fc` per gene, one point per gene):
 
 ``` r
 
-layout_str <- "
-IIII
-AAAB
-CCDD
-GGGG
-GGGG
-"
-seq_preview_layout(layout = layout_str)
+gene_meta <- GRanges("chr1",
+  IRanges(start = seq(1.1e6, 2.9e6, length.out = 14), width = 1e4),
+  log2fc = c(-2.4, -1.3, 0.9, 2.1,  1.6, -0.5,  2.7,
+              0.4, -1.8,  1.2, 0.2,  0.8, -2.2,  1.1),
+  sig    = c("down","down","ns","up","up","ns","up",
+             "ns","down","up","ns","ns","down","up"))
+
+sig_cols <- c(up = "#AF3029", down = "#205EA6", ns = "#878580")
 ```
 
-![](elements_files/figure-html/layout-preview-1.png)
-
-Each track’s `data` / `mapping` is declared independently. Tracks whose
-`track_id` isn’t present in the layout string are silently skipped, so
-the same operator chain can be reused across different layouts by
-swapping the string.
+**Genomic x, scalar y (conventional).** `x = start` runs along the 1–3
+Mb genomic window; `y = log2fc` is scalar.
 
 ``` r
 
-# Shared elements + per-track datasets --------------------------------------
-sig_xs <- seq(1.05e6, 2.95e6, length.out = 80)
-sig_mu <- sin((sig_xs - 1e6) / 3e5) * 0.25 + 0.55
-sig_gr <- GRanges("chr1", IRanges(sig_xs, width = 1),
-                  mean = sig_mu,
-                  lo   = sig_mu - 0.1,
-                  hi   = sig_mu + 0.1)
+seq_plot() %|%
+  seq_track(data = gene_meta,
+            mapping = map(x = start, y = log2fc, color = sig),
+            windows = win) %+%
+  seq_segment(mapping = map(x = start, x_end = start,
+                            y = 0, y_end = log2fc, color = sig),
+              aesthetics = aes(linewidth = 2)) %+%
+  seq_point(aesthetics = aes(size = 0.9)) -> p
+p$plot()
+#> 14 out-of-bounds data points excluded! (seq_point)
+```
 
-density_gr <- GRanges("chr1",
-  IRanges(start = seq(1e6, 3e6, length.out = 200), width = 1),
-  score = c(rnorm(120, 0.3, 0.05),
-            rnorm(80,  0.7, 0.08)))
+![](elements_files/figure-html/genomic-x-scalar-y-1.png)
 
-mut_gr <- GRanges("chr1",
-  IRanges(start = sample(seq(1.05e6, 2.95e6, by = 1e4), 18), width = 1),
-  impact = runif(18, 0.2, 1.0))
+**Scalar x, genomic y (flipped).** `scale_x` carries `log2fc` in
+`[-3, 3]`; `scale_y = seq_scale_genomic(win)` puts genomic position on
+the vertical axis. The lollipops now fan out horizontally from `x = 0`,
+with one row per gene at its true genomic coordinate.
 
-seq_plot(layout = layout_str) %+%
-  # I — ideogram strip
-  seq_track(track_id = "I",
-            windows = create_genome_windows("chr1:1000000-3000000")) %+%
-    seq_ideogram(data = cb) %+%
-  # A — signal ribbon
-  seq_track(track_id = "A",
-            data = sig_gr,
-            mapping = map(x = start, y_min = lo, y_max = hi),
-            windows = win) %+%
-    seq_ribbon(aesthetics = aes(fill = "#4385BE", alpha = 0.5)) %+%
-  # B — density sidebar
-  seq_track(track_id = "B",
-            data = density_gr,
-            mapping = map(x = start, y = score),
-            windows = win) %+%
-    seq_density(aesthetics = aes(fill = "#879A39", alpha = 0.7)) %+%
-  # C — bar summary
-  seq_track(track_id = "C",
-            data = bar_gr,
-            mapping = map(x = start, y = score),
-            windows = win) %+%
-    seq_bar(aesthetics = aes(fill = "#8B7EC8")) %+%
-  # D — lollipop mutation calls
-  seq_track(track_id = "D",
-            data = mut_gr,
-            mapping = map(x = start, y = impact),
-            windows = win) %+%
-    seq_lollipop(aesthetics = aes(color = "#AF3029", linewidth = 1.2)) %+%
-  # G — gene models spanning the full bottom row
-  seq_track(track_id = "G",
-            data = gene_gr,
-            mapping = map(group  = gene_id,
-                          type   = feature,
-                          strand = strand_col,
-                          label  = gene_name,
-                          color  = color),
-            windows = win) %+%
-    seq_gene(map(group  = gene_id,
-                 type   = feature,
-                 strand = strand_col,
-                 label  = gene_name,
-                 color  = color)) -> p
+``` r
+
+seq_plot() %|%
+  seq_track(data = gene_meta,
+            mapping = map(x = log2fc, y = mid, color = sig),
+            windows = win,
+            scale_x = seq_scale_continuous(limits = c(-3, 3)),
+            scale_y = seq_scale_genomic(win),
+            track_width = 0.6) %+%
+  seq_segment(mapping = map(x = 0, x_end = log2fc,
+                            y = mid, y_end = mid, color = sig),
+              aesthetics = aes(linewidth = 2)) %+%
+  seq_point(aesthetics = aes(size = 0.9)) -> p
 p$plot()
 ```
 
-![](elements_files/figure-html/complex-layout-1.png)
+![](elements_files/figure-html/genomic-y-scalar-x-1.png)
 
-The same set of elements assembles with a positional chain — useful when
-the track count is modest and a patchwork string is overkill. Here a
-2-row, 2-region browser pairs a coverage area and a multi-region bar
-track above a gene strip:
+The two plots encode the same table — only the orientation of the
+genomic axis changes. In the flipped version the y-tick labels fall back
+to Mb units (the genomic `yScaleFactor`, matching the x-axis default) so
+`1.5 Mb` reads as `1.5` rather than `1,500,000`.
+
+### Coverage signal flipped onto the y-axis
+
+The same principle extends to continuous signal. Below, a coverage curve
+is shown first in the conventional orientation, then flipped so depth
+runs along x and genomic position along y — useful as a narrow sidebar
+next to a wider browser panel.
 
 ``` r
 
-# Coverage signal spanning both regions
-multi_sig_xs <- c(seq(1.05e6, 2.95e6, length.out = 60),
-                  seq(5.05e6, 6.45e6, length.out = 50))
-multi_sig_gr <- GRanges("chr1", IRanges(multi_sig_xs, width = 1),
-  depth = 0.5 + 0.25 * sin((multi_sig_xs - 1e6) / 4e5))
+cov_xs <- seq(1.05e6, 2.95e6, length.out = 200)
+cov_gr <- GRanges("chr1", IRanges(cov_xs, width = 1),
+                  depth = 0.5 + 0.3 * sin((cov_xs - 1e6) / 3e5))
+```
 
-# Gene models split across the two regions
-multi_gene_gr <- GRanges("chr1",
-  IRanges(start = c(1.20e6, 1.35e6, 1.50e6,
-                    2.05e6, 2.18e6, 2.30e6,
-                    5.15e6, 5.25e6, 5.38e6,
-                    6.10e6, 6.20e6, 6.32e6),
-          width = rep(c(8e4, 6e4, 5e4), 4)),
-  gene_id    = rep(c("G1", "G2", "G3", "G4"), each = 3),
-  gene_name  = rep(c("G1", "G2", "G3", "G4"), each = 3),
-  strand_col = rep(c("+", "-", "+", "-"),     each = 3),
-  feature = rep("exon", 12),
-  color   = rep(c("#205EA6", "#AF3029", "#66800B", "#BC5215"), each = 3))
+``` r
 
 seq_plot() %|%
-  seq_track(track_id = "Coverage",
-            data = multi_sig_gr,
+  seq_track(data = cov_gr,
             mapping = map(x = start, y = depth),
-            windows = multi_win, track_height = 1.0) %+%
-    seq_area(aesthetics = aes(fill = "#4385BE",
-                              color = "#205EA6",
-                              alpha = 0.55,
-                              linewidth = 0.7)) %__%
-  seq_track(track_id = "Bars",
-            data = multi_gr,
-            mapping = map(x = start, y = score, group = region),
-            windows = multi_win, track_height = 0.8) %+%
-    seq_bar() %__%
-  seq_track(track_id = "Genes",
-            data = multi_gene_gr,
-            mapping = map(group  = gene_id,
-                          type   = feature,
-                          strand = strand_col,
-                          label  = gene_name,
-                          color  = color),
-            windows = multi_win, track_height = 1.2) %+%
-    seq_gene(map(group  = gene_id,
-                 type   = feature,
-                 strand = strand_col,
-                 label  = gene_name,
-                 color  = color)) -> p
+            windows = win) %+%
+  seq_area(aesthetics = aes(fill = "#4385BE",
+                            color = "#205EA6",
+                            alpha = 0.6, linewidth = 0.7)) -> p
 p$plot()
 ```
 
-![](elements_files/figure-html/positional-multiregion-1.png)
+![](elements_files/figure-html/genomic-x-cov-1.png)
 
-Each track’s panels align vertically across rows because they share the
-same `windows` GRanges — so the left panel in `Coverage`, `Bars`, and
-`Genes` all show the same 1–3 Mb region, and the right panel shows 5–6.5
-Mb. Cross-track links (`seq_string`, `seq_synteny`, `seq_zoom`) can be
-dropped on top of a layout like this; see the `links` vignette for
-worked examples.
+``` r
+
+seq_plot() %|%
+  seq_track(data = cov_gr,
+            mapping = map(x = depth, y = start),
+            windows = win) %+%
+  seq_area(aesthetics = aes(fill = "#4385BE",
+                            color = "#205EA6",
+                            alpha = 0.6, linewidth = 0.7)) -> p
+p$plot()
+```
+
+![](elements_files/figure-html/genomic-y-cov-1.png)

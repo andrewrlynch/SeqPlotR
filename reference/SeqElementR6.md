@@ -1,16 +1,16 @@
 # SeqElement R6 base class
 
-SeqElement R6 base class
-
-SeqElement R6 base class
-
-## Details
-
-Internal R6 generator for the base class of every drawable element.
-Subclasses override `prep()` and `draw()`. Not user-facing — concrete
+R6 generator for the base class of every drawable element. Concrete
 elements expose snake_case constructors (e.g.
-[`seq_point()`](http://andrewlynch.io/SeqPlotR/reference/seq_point.md))
-defined in their own files.
+[`seq_point()`](http://andrewlynch.io/SeqPlotR/reference/seq_point.md));
+the generator is exported so that other packages can subclass it.
+Subclasses override `prep()` (resolve mappings and fill `coordCanvas`
+with canvas npc values) and `draw()` (grid calls only).
+
+When the parent track's `scale_y` carries a `transform` (see
+[`seq_scale_count()`](http://andrewlynch.io/SeqPlotR/reference/seq_scale_count.md)),
+`resolve()` applies it to every numeric resolved field named in
+`y_fields`, for elements on the primary y axis.
 
 ## Public fields
 
@@ -54,33 +54,43 @@ defined in their own files.
   `legend` is `NULL`. Users should not set this directly — use the
   `legend` field instead.
 
+- `y_transform`:
+
+  Function or `NULL`. Transform of the parent track's primary y scale,
+  set when the element is added to a track.
+
+- `y_fields`:
+
+  Character. Resolved fields in y axis units that receive `y_transform`.
+  Subclasses override this with their own y fields.
+
 ## Methods
 
 ### Public methods
 
-- [`SeqElementR6$new()`](#method-SeqElement-new)
+- [`SeqElement$new()`](#method-SeqElement-initialize)
 
-- [`SeqElementR6$resolve()`](#method-SeqElement-resolve)
+- [`SeqElement$resolve()`](#method-SeqElement-resolve)
 
-- [`SeqElementR6$prep()`](#method-SeqElement-prep)
+- [`SeqElement$prep()`](#method-SeqElement-prep)
 
-- [`SeqElementR6$draw()`](#method-SeqElement-draw)
+- [`SeqElement$draw()`](#method-SeqElement-draw)
 
-- [`SeqElementR6$.infer_scale_y()`](#method-SeqElement-.infer_scale_y)
+- [`SeqElement$.infer_scale_y()`](#method-SeqElement-.infer_scale_y)
 
-- [`SeqElementR6$collect_legend_keys()`](#method-SeqElement-collect_legend_keys)
+- [`SeqElement$collect_legend_keys()`](#method-SeqElement-collect_legend_keys)
 
-- [`SeqElementR6$clone()`](#method-SeqElement-clone)
+- [`SeqElement$clone()`](#method-SeqElement-clone)
 
 ------------------------------------------------------------------------
 
-### Method `new()`
+### `SeqElement$new()`
 
 Construct a new SeqElementR6.
 
 #### Usage
 
-    SeqElementR6$new(
+    SeqElement$new(
       data = NULL,
       mapping = NULL,
       aesthetics = aes(),
@@ -118,7 +128,7 @@ Construct a new SeqElementR6.
 
 ------------------------------------------------------------------------
 
-### Method `resolve()`
+### `SeqElement$resolve()`
 
 Resolve the effective data + mapping for this element by merging in the
 parent track's defaults. Element fields take priority; missing fields
@@ -126,7 +136,7 @@ are inherited from the track.
 
 #### Usage
 
-    SeqElementR6$resolve(track_data = NULL, track_mapping = NULL)
+    SeqElement$resolve(track_data = NULL, track_mapping = NULL)
 
 #### Arguments
 
@@ -144,13 +154,13 @@ The element, invisibly.
 
 ------------------------------------------------------------------------
 
-### Method `prep()`
+### `SeqElement$prep()`
 
 Override in subclasses. Default implementation errors.
 
 #### Usage
 
-    SeqElementR6$prep(layout_track, track_windows)
+    SeqElement$prep(layout_track, track_windows)
 
 #### Arguments
 
@@ -164,17 +174,17 @@ Override in subclasses. Default implementation errors.
 
 ------------------------------------------------------------------------
 
-### Method `draw()`
+### `SeqElement$draw()`
 
 Override in subclasses. Default implementation errors.
 
 #### Usage
 
-    SeqElementR6$draw()
+    SeqElement$draw()
 
 ------------------------------------------------------------------------
 
-### Method `.infer_scale_y()`
+### `SeqElement$.infer_scale_y()`
 
 Infer a `SeqPositionScale` for the y-axis from the resolved `y` mapping.
 Used by `SeqPlotR6$layoutGrid()` before any `prep()` call so that
@@ -184,11 +194,11 @@ available.
 
 #### Usage
 
-    SeqElementR6$.infer_scale_y()
+    SeqElement$.infer_scale_y()
 
 ------------------------------------------------------------------------
 
-### Method `collect_legend_keys()`
+### `SeqElement$collect_legend_keys()`
 
 Collect legend keys contributed by this element. Returns a list of
 entries, each a named list with fields:
@@ -210,7 +220,7 @@ Returns `NULL` when `show_legend` is `FALSE` or `legend` is `NULL`.
 
 #### Usage
 
-    SeqElementR6$collect_legend_keys()
+    SeqElement$collect_legend_keys()
 
 #### Returns
 
@@ -218,13 +228,13 @@ A list of entries, or `NULL`.
 
 ------------------------------------------------------------------------
 
-### Method `clone()`
+### `SeqElement$clone()`
 
 The objects of this class are cloneable with this method.
 
 #### Usage
 
-    SeqElementR6$clone(deep = FALSE)
+    SeqElement$clone(deep = FALSE)
 
 #### Arguments
 

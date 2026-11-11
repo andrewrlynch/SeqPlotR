@@ -1,22 +1,22 @@
-# Legends in SeqPlotR
+# Legends
 
-SeqPlotR attaches legend metadata directly to the elements that draw the
-data. A `LegendKey` describes one glyph-plus-label row; a
-`SeqLegendSpec` says where and how to lay those rows out. For continuous
-color scales,
+SeqPlotR attaches legend metadata to the elements that draw the data. A
+`LegendKey` describes one glyph-plus-label row and a `SeqLegendSpec`
+(from
+[`seq_legend()`](http://andrewlynch.io/SeqPlotR/reference/seq_legend.md))
+says where to lay rows out. For continuous scales,
 [`seq_gradient_legend()`](http://andrewlynch.io/SeqPlotR/reference/seq_gradient_legend.md)
-produces a `GradientLegendSpec` that renders as a filled color bar with
-a tick axis. Three position families are supported:
+produces a color bar. Legends are also generated automatically when
+[`map()`](http://andrewlynch.io/SeqPlotR/reference/map.md) binds
+`color`, `fill` or `shape` to a column. Three positions are supported:
 
-| Position          | Where it renders                                        |
-|-------------------|---------------------------------------------------------|
-| `"inside"`        | Overlaid on the data panel — no margin space required.  |
-| `"track_margin"`  | In the canvas margin alongside a specific track.        |
-| `"canvas_margin"` | Aggregated from all tracks into one shared margin band. |
+| Position          | Where it renders                                 |
+|-------------------|--------------------------------------------------|
+| `"inside"`        | Overlaid on the data panel.                      |
+| `"track_margin"`  | In the canvas margin beside one track.           |
+| `"canvas_margin"` | Aggregated from all tracks into one margin band. |
 
-------------------------------------------------------------------------
-
-## Data used in this vignette
+### Data
 
 ``` r
 
@@ -61,48 +61,57 @@ library(GenomicRanges)
 #> Loading required package: IRanges
 #> Loading required package: Seqinfo
 
-# 1-Mb window; axis labels will read 0.0 – 1.0 (scaled by 1e-6)
 win <- GRanges("chr1", IRanges(1, 1e6))
 
-# Synthetic ChIP-seq signal: sparse background with 8 sharp peaks
+# sparse ChIP-like signal with sharp peaks
 make_chip <- function(n = 200, n_peaks = 8, seed = 1) {
   set.seed(seed)
   starts <- sort(sample(1:999000, n))
-  scores <- runif(n, 0, 0.15)                        # flat baseline
-  peaks  <- sort(sample(seq_len(n), n_peaks))
-  for (pk in peaks) {
+  scores <- runif(n, 0, 0.15)
+  for (pk in sort(sample(seq_len(n), n_peaks))) {
     w <- max(1, pk - 3):min(n, pk + 3)
     scores[w] <- scores[w] + runif(length(w), 0.4, 0.85)
   }
   GRanges("chr1", IRanges(starts, width = 1), score = pmin(scores, 1))
 }
+gr_a <- make_chip(seed = 1)
+gr_b <- make_chip(seed = 2)
 
-gr_a <- make_chip(seed = 1)   # H3K27ac-like
-gr_b <- make_chip(seed = 2)   # H3K4me3-like
-
-# Continuous-score data for gradient legend examples
+# continuous scores for gradient examples
 set.seed(42)
-n_pts  <- 120
-gr_cnt <- GRanges(
-  "chr1",
-  IRanges(sort(sample(1:999000, n_pts)), width = 1),
-  score = round(runif(n_pts, 0, 100), 1)
-)
+gr_cnt <- GRanges("chr1", IRanges(sort(sample(1:999000, 120)), width = 1),
+                  score = round(runif(120, 0, 100), 1))
+
+# contact-map-like tiles
+n_bins <- 60
+starts_hic <- seq(1, 1e6, length.out = n_bins + 1)[-(n_bins + 1)]
+pairs <- expand.grid(i = seq_len(n_bins), j = seq_len(n_bins))
+pairs <- pairs[pairs$j >= pairs$i, ]
+gr_tiles <- GRanges("chr1", IRanges(starts_hic[pairs$i], width = 1e6 / n_bins),
+                    y = pairs$j,
+                    fill = pmax(0, pmin(1, round(exp(-(pairs$j - pairs$i) * 0.08) +
+                                                   rnorm(nrow(pairs), 0, 0.05), 3))))
+
+# simulated chromothripsis on chr3: somatic SNVs and copy-number segments
+sim <- function(f) utils::read.delim(system.file("extdata", "sim", "ct", f, package = "SeqPlotR"))
+snv <- sim("snvs.tsv")
+snv <- GRanges(snv$chrom, IRanges(snv$pos, width = 1), vaf = snv$vaf, depth = snv$depth,
+               sbs6 = snv$sbs6, clonality = ifelse(snv$clonal, "clonal", "subclonal"))
+seg <- sim("segments.tsv")
+seg <- GRanges(seg$chrom, IRanges(seg$start, seg$end), cn = seg$cn,
+               state = ifelse(seg$cn > 2, "gain", ifelse(seg$cn < 2, "loss", "neutral")))
+win_ct <- GRanges("chr3", IRanges(9.5e7, 1.95e8))
+
+# right margin wide enough for auto-generated legends
+right_margin <- aes(margins = list(top = 0, right = 0.25, bottom = 0, left = 0))
 ```
 
-------------------------------------------------------------------------
+## Manual legends
 
-## 1. Inside legends
+### Inside
 
-Inside legends are overlaid directly on the data panel. They require no
-extra margin space.
-
-### Quick placement with a bare `LegendKey`
-
-Pass a bare `LegendKey` to `legend` and it is automatically wrapped into
-an inside legend centered in the panel (`x = 0.5, y = 0.5`). No
-[`seq_legend()`](http://andrewlynch.io/SeqPlotR/reference/seq_legend.md)
-call is needed:
+A bare `LegendKey` passed to `legend` is auto-placed at the panel
+centre.
 
 ``` r
 
@@ -122,12 +131,10 @@ centre.](legends_files/figure-html/inside-bare-1.png)
 
 A bare LegendKey is auto-placed at the panel centre.
 
-### Controlling placement with `seq_legend()`
-
-Use
 [`seq_legend()`](http://andrewlynch.io/SeqPlotR/reference/seq_legend.md)
-to pin the legend to a specific corner. `x` and `y` are fractions of the
-panel width and height; `y = 0.95` places the anchor near the top:
+pins the legend to a corner. `x` and `y` are fractions of the panel;
+`hjust = 1` right-aligns the block and `orientation = "horizontal"` puts
+the keys in one row.
 
 ``` r
 
@@ -158,11 +165,6 @@ title.](legends_files/figure-html/inside-anchored-1.png)
 
 seq_legend() anchors the legend to the top-left corner with a title.
 
-### Right-aligned horizontal layout
-
-`hjust = 1` right-aligns the key block; `orientation = "horizontal"`
-puts all keys in one row:
-
 ``` r
 
 spec_h <- seq_legend(
@@ -189,13 +191,10 @@ top.](legends_files/figure-html/inside-horizontal-1.png)
 
 Two keys in a horizontal row, right-aligned at the top.
 
-------------------------------------------------------------------------
+### Track margin
 
-## 2. Track-margin legends
-
-`"track_margin"` draws the legend in the canvas margin *beside* one
-specific track. Set `side` to choose the edge and enlarge the matching
-plot margin so there is room to render:
+`"track_margin"` draws the legend in the margin beside one track. Set
+`side` and enlarge the matching plot margin to make room.
 
 ``` r
 
@@ -227,8 +226,8 @@ track.](legends_files/figure-html/track-margin-1.png)
 
 Two-key vertical legend in the 18% left canvas margin beside the track.
 
-`orientation` defaults to `"vertical"` for
-`side %in% c("left", "right")` and `"horizontal"` for top / bottom:
+`orientation` defaults to `"vertical"` for left and right sides and
+`"horizontal"` for top and bottom:
 
 ``` r
 
@@ -238,18 +237,12 @@ seq_legend(k1, position = "track_margin", side = "top")$orientation
 #> [1] "horizontal"
 ```
 
-------------------------------------------------------------------------
+### Canvas margin
 
-## 3. Canvas-margin legends (aggregated)
-
-`"canvas_margin"` collects legend entries from **all tracks** and
-renders them once, spanning the full width of the chosen margin side.
-Keys from specs that share the same `title` are merged under one
-heading.
-
-Use `%__%` instead of `%+%` to stack the second track below the first
-(`direction = "under"`). Without stacking both tracks would sit
-side-by-side in a single row:
+`"canvas_margin"` collects entries from all tracks and renders them once
+across the chosen margin. Specs sharing a `title` merge under one
+heading; differing titles are separated into groups. Use `%__%` to stack
+the tracks.
 
 ``` r
 
@@ -279,9 +272,6 @@ top.](legends_files/figure-html/canvas-margin-1.png)
 
 Two stacked tracks sharing a single canvas-margin legend at the top.
 
-When track titles differ, `canvas_margin` inserts a separator between
-groups. Here the two tracks use different titles to show the grouping:
-
 ``` r
 
 spec_ca2 <- seq_legend(k1, title = "Active enhancers",
@@ -309,21 +299,15 @@ margin.](legends_files/figure-html/canvas-margin-groups-1.png)
 
 Two title groups separated in the canvas margin.
 
-------------------------------------------------------------------------
+## Gradient color bars
 
-## 4. Gradient color bars
-
-Continuous color scales need a color bar rather than discrete key rows.
 [`seq_gradient_legend()`](http://andrewlynch.io/SeqPlotR/reference/seq_gradient_legend.md)
-produces a `GradientLegendSpec` that renders as a filled rectangle
-graded from the palette’s low to high color, with a tick-and- label axis
-derived from the data limits.
-
-The placement arguments (`position`, `x`, `y`, `hjust`, `orientation`,
-`side`) work identically to
+renders a filled bar graded from the palette’s low to high colour with a
+tick axis. Placement arguments (`position`, `x`, `y`, `hjust`,
+`orientation`, `side`) work as in
 [`seq_legend()`](http://andrewlynch.io/SeqPlotR/reference/seq_legend.md).
 
-### Manual color bar inside the panel
+### Manual placement
 
 ``` r
 
@@ -353,10 +337,7 @@ panel.](legends_files/figure-html/gradient-inside-1.png)
 
 Vertical viridis color bar pinned to the right side of the panel.
 
-### Color bar in the track margin
-
-Place the bar in the right track margin for a clean separation from the
-data:
+Place the bar in the track margin for a clean separation from the data:
 
 ``` r
 
@@ -389,49 +370,12 @@ margin.](legends_files/figure-html/gradient-track-margin-1.png)
 
 Horizontal plasma color bar in the right track margin.
 
-### Auto-legend from `map()`
+### Tick breaks
 
-When a continuous column is mapped via
-[`map()`](http://andrewlynch.io/SeqPlotR/reference/map.md) on a
-supported element (`SeqBar`, `SeqLine`, `SeqArea`, `SeqPoint`,
-`SeqSegment`, `SeqTile`, `SeqRect`), a `GradientLegendSpec` is generated
-automatically — no
-[`seq_gradient_legend()`](http://andrewlynch.io/SeqPlotR/reference/seq_gradient_legend.md)
-call is needed. The bar defaults to `position = "track_margin"`,
-`side = "right"`.
-
-Pass `show_legend = FALSE` to opt out for a specific element:
-
-``` r
-
-p_auto <- seq_plot(
-  aesthetics = aes(margins = list(top    = 0.03, bottom = 0.03,
-                                   left   = 0.03, right  = 0.20))
-) %+%
-  seq_track(data = gr_cnt, mapping = map(x = start, y = score),
-            windows = win) %+%
-  seq_bar(
-    mapping    = map(fill = score),
-    aesthetics = aes(alpha = 0.9)
-    # show_legend = FALSE   # uncomment to suppress the auto bar
-  )
-p_auto$plot()
-```
-
-![Auto color bar from map(fill = score); no seq_gradient_legend()
-needed.](legends_files/figure-html/gradient-auto-1.png)
-
-Auto color bar from map(fill = score); no seq_gradient_legend() needed.
-
-### Controlling tick breaks
-
-`breaks` accepts three forms:
-
-- `NULL` (default) — [`pretty()`](https://rdrr.io/r/base/pretty.html)
-  with five ticks.
-- A single integer — [`pretty()`](https://rdrr.io/r/base/pretty.html)
-  targeting that many ticks.
-- A numeric vector — exact break values.
+`breaks` is `NULL` (default
+[`pretty()`](https://rdrr.io/r/base/pretty.html) ticks), a single
+integer ([`pretty()`](https://rdrr.io/r/base/pretty.html) targeting that
+many ticks), or a numeric vector of exact values.
 
 ``` r
 
@@ -462,17 +406,203 @@ p_brk$plot()
 
 Color bar with explicit breaks at 0, 25, 50, 75, 100.
 
-------------------------------------------------------------------------
+A gradient legend attached to a `seq_tile` heatmap:
 
-## 5. Suppression
+``` r
 
-Legends can be silenced at three granularities. Each level overrides all
-finer-grained settings below it.
+hleg <- seq_gradient_legend(
+  palette     = "reds",
+  limits      = c(0, 1),
+  title       = "Contact\nfrequency",
+  breaks      = 4,
+  x           = 0.72, y = 0.95,
+  orientation = "vertical",
+  position    = "inside"
+)
 
-### Element level
+p11 <- seq_plot(
+  aesthetics = aes(margins = list(top = 0.04, bottom = 0.04,
+                                   left = 0.04, right = 0.04))
+) %+%
+  seq_track(windows = win) %+%
+  seq_tile(
+    data    = gr_tiles,
+    mapping = map(x = start, y = y, fill = fill),
+    legend  = hleg
+  )
+p11$plot()
+```
 
-`show_legend = FALSE` on one element silences only that element, leaving
-others in the same track unaffected:
+![Contact-map heatmap with a four-tick gradient legend placed
+inside.](legends_files/figure-html/heatmap-labelled-1.png)
+
+Contact-map heatmap with a four-tick gradient legend placed inside.
+
+## Automatic legends
+
+Mapping a column to `color`, `fill` or `shape` generates a legend with
+no
+[`seq_legend()`](http://andrewlynch.io/SeqPlotR/reference/seq_legend.md)
+call. Discrete columns give a keyed legend (flexoki palette; shapes
+cycle circle, square, triangle, diamond) and numeric columns give a
+viridis color bar. Auto-legends go in the right track margin, so reserve
+space with the plot-level `margins` aesthetic. An explicit `legend`
+always overrides auto-generation.
+
+The examples below use a simulated chromothripsis sample. `snv` holds
+its somatic SNVs on chr3 (variant allele fraction, read depth, the
+six-class mutation type `sbs6`, and whether the SNV is clonal), and
+`seg` holds its copy-number segments, where the shattered region between
+100 and 190 Mb oscillates between copy number 3 and 1.
+
+Mapping `color` to the mutation type gives a six-level discrete legend:
+
+``` r
+
+p1 <- seq_plot(aesthetics = right_margin) %+%
+  seq_track(data = snv, mapping = map(x = start, y = vaf), windows = win_ct) %+%
+  seq_point(
+    aesthetics = aes(size = 0.6, alpha = 0.7),
+    mapping    = map(color = sbs6)
+  )
+p1$plot()
+```
+
+![Six-level discrete color legend for SNV mutation type in the right
+track margin.](legends_files/figure-html/auto-discrete-1.png)
+
+Six-level discrete color legend for SNV mutation type in the right track
+margin.
+
+Mapping `shape` to clonality marks clonal and subclonal SNVs with
+different glyphs:
+
+``` r
+
+p2 <- seq_plot(aesthetics = right_margin) %+%
+  seq_track(data = snv, mapping = map(x = start, y = vaf), windows = win_ct) %+%
+  seq_point(
+    aesthetics = aes(size = 0.8, alpha = 0.7),
+    mapping    = map(shape = clonality)
+  )
+p2$plot()
+```
+
+![Shape legend auto-generated from map(shape = clonality) in the right
+track margin.](legends_files/figure-html/auto-shape-1.png)
+
+Shape legend auto-generated from map(shape = clonality) in the right
+track margin.
+
+A numeric column gives a color bar. Here read depth is on the y axis,
+which drops where the copy number falls to 1, and the color shows the
+variant allele fraction:
+
+``` r
+
+p3 <- seq_plot(aesthetics = right_margin) %+%
+  seq_track(data = snv, mapping = map(x = start, y = depth), windows = win_ct) %+%
+  seq_point(
+    aesthetics = aes(size = 0.7, alpha = 0.8),
+    mapping    = map(color = vaf)
+  )
+p3$plot()
+```
+
+![Viridis color bar with auto tick axis for SNV variant allele
+fraction.](legends_files/figure-html/auto-continuous-1.png)
+
+Viridis color bar with auto tick axis for SNV variant allele fraction.
+
+The same applies to other elements, including `seq_bar`, `seq_segment`
+and `seq_tile` heatmaps. Copy-number segments drawn as bars take their
+fill from the gain, loss or neutral state:
+
+``` r
+
+p4 <- seq_plot(aesthetics = right_margin) %+%
+  seq_track(data = seg, mapping = map(x = start, y = cn), windows = win_ct,
+            scale_y = seq_scale_continuous(limits = c(0, 3.2))) %+%
+  seq_bar(
+    aesthetics = aes(alpha = 0.85),
+    mapping    = map(x = start, y = cn, fill = state)
+  )
+p4$plot()
+```
+
+![Copy-number segment bars with a discrete fill legend from map(fill =
+state).](legends_files/figure-html/auto-bar-discrete-1.png)
+
+Copy-number segment bars with a discrete fill legend from map(fill =
+state).
+
+`seq_segment` draws one horizontal line per copy-number segment, colored
+by state:
+
+``` r
+
+p5 <- seq_plot(aesthetics = right_margin) %+%
+  seq_track(data = seg, mapping = map(x = start, y = cn), windows = win_ct,
+            scale_y = seq_scale_continuous(limits = c(0, 3.5))) %+%
+  seq_segment(
+    aesthetics = aes(linewidth = 3),
+    mapping    = map(x = start, x_end = end, y = cn, y_end = cn, color = state)
+  )
+p5$plot()
+```
+
+![seq_segment with a discrete color legend from map(color =
+state).](legends_files/figure-html/auto-segment-1.png)
+
+seq_segment with a discrete color legend from map(color = state).
+
+A numeric fill gives a gradient. Here the bar fill follows the integer
+copy number:
+
+``` r
+
+p6 <- seq_plot(aesthetics = right_margin) %+%
+  seq_track(data = seg, mapping = map(x = start, y = cn), windows = win_ct,
+            scale_y = seq_scale_continuous(limits = c(0, 3.2))) %+%
+  seq_bar(
+    mapping = map(x = start, y = cn, fill = cn)
+  )
+p6$plot()
+```
+
+![Copy-number segment bars with a continuous fill gradient from map(fill
+= cn).](legends_files/figure-html/auto-gradient-bar-1.png)
+
+Copy-number segment bars with a continuous fill gradient from map(fill =
+cn).
+
+The tile heatmap keeps the contact-map tiles, since the simulated data
+has no contact matrix:
+
+``` r
+
+p7 <- seq_plot(
+  aesthetics = aes(margins = list(top = 0.04, bottom = 0.04,
+                                   left = 0.04, right = 0.25))
+) %+%
+  seq_track(windows = win) %+%
+  seq_tile(
+    data    = gr_tiles,
+    mapping = map(x = start, y = y, fill = fill)
+  )
+p7$plot()
+```
+
+![Contact-map tiles with auto gradient
+legend.](legends_files/figure-html/auto-heatmap-1.png)
+
+Contact-map tiles with auto gradient legend.
+
+## Suppression
+
+Each level overrides the finer levels below it. `show_legend = FALSE` on
+an element silences only that element, including its auto-generated bar
+or legend:
 
 ``` r
 
@@ -486,8 +616,6 @@ is.null(el_hidden$collect_legend_keys())  # TRUE  — suppressed
 #> [1] TRUE
 ```
 
-This also suppresses auto-generated gradient bars:
-
 ``` r
 
 el_no_bar <- seq_bar(mapping = map(fill = score), show_legend = FALSE)
@@ -495,12 +623,7 @@ is.null(el_no_bar$auto_legend)   # TRUE — no bar generated
 #> [1] TRUE
 ```
 
-### Track level
-
-`show_legend = FALSE` on a
-[`seq_track()`](http://andrewlynch.io/SeqPlotR/reference/seq_track.md)
-silences every element in that track, regardless of individual element
-settings:
+On a track it silences every element in that track:
 
 ``` r
 
@@ -511,12 +634,9 @@ is.null(trk$collect_legend_keys())   # TRUE — whole track suppressed
 #> [1] TRUE
 ```
 
-### Plot level
-
-Pass `show_legend = FALSE` (or the shorthand `legend = FALSE`) to
-[`seq_plot()`](http://andrewlynch.io/SeqPlotR/reference/seq_plot.md) to
-suppress all legend output for the entire plot, including auto-generated
-gradient bars:
+`legend = FALSE` (or `show_legend = FALSE`) on
+[`seq_plot()`](http://andrewlynch.io/SeqPlotR/reference/seq_plot.md)
+removes all legend output, auto-generated included:
 
 ``` r
 
@@ -535,19 +655,11 @@ output.](legends_files/figure-html/suppress-plot-1.png)
 
 legend = FALSE on seq_plot() removes all legend output.
 
-------------------------------------------------------------------------
+## Inspecting legend metadata
 
-## 6. Inspecting legend metadata: `collect_legend_keys()`
-
-`collect_legend_keys()` aggregates legend entries from an element, a
-track, or (transitively) all tracks in a plot. It returns `NULL` when
-nothing contributes, or a list of named lists:
-
-| Field | Content |
-|----|----|
-| `title` | Group heading (from `LegendKey$title` or `SeqLegendSpec$title`). |
-| `key` | The `LegendKey` object. |
-| `element_class` | R6 class name of the contributing element. |
+`collect_legend_keys()` aggregates entries from an element, a track, or
+all tracks in a plot. It returns `NULL` when nothing contributes,
+otherwise a list with `title`, `key` and `element_class`.
 
 ``` r
 
@@ -570,8 +682,6 @@ str(el$collect_legend_keys()[[1]])
 #>  $ element_class: chr "SeqArea"
 ```
 
-Track-level aggregation flattens all element entries:
-
 ``` r
 
 el1 <- seq_area(legend = LegendKey(label = "H3K27ac", color = "#A02020"))
@@ -587,37 +697,22 @@ for (entry in keys)
 #>   H3K4me3 — SeqArea
 ```
 
-------------------------------------------------------------------------
-
 ## Summary
 
 | Task | How |
 |----|----|
 | Attach a legend, auto-placed at panel centre | `seq_area(legend = LegendKey(...))` |
-| Anchor to a specific corner | `seq_legend(keys, position="inside", x=, y=)` |
-| Draw beside one track | `seq_legend(keys, position="track_margin", side=)` + enlarge that margin |
-| Aggregate from all tracks into one band | `seq_legend(keys, position="canvas_margin", side=)` |
-| Add a continuous color bar (manual) | `seq_gradient_legend(palette=, limits=, ...)` |
-| Add a continuous color bar (auto) | `map(fill = score)` or `map(color = score)` on any supported element |
-| Suppress one element | `seq_area(show_legend = FALSE)` |
-| Suppress a whole track | `seq_track(show_legend = FALSE)` |
-| Suppress the entire plot | `seq_plot(legend = FALSE)` or `seq_plot(show_legend = FALSE)` |
-| Inspect what will be shown | `element$collect_legend_keys()` / `track$collect_legend_keys()` |
+| Anchor to a corner | `seq_legend(keys, position = "inside", x =, y =)` |
+| Beside one track | `seq_legend(keys, position = "track_margin", side =)` plus a wider margin |
+| One band for all tracks | `seq_legend(keys, position = "canvas_margin", side =)` |
+| Continuous color bar | `seq_gradient_legend(palette =, limits =, breaks =)` |
+| Automatic legend | `map(color = col)`, `map(fill = col)` or `map(shape = col)` |
+| Suppress | `show_legend = FALSE` on an element or track; `legend = FALSE` on the plot |
 
-| `position`        | Best for                                               |
-|-------------------|--------------------------------------------------------|
-| `"inside"`        | Single-track plots; compact per-track annotation       |
-| `"track_margin"`  | When you want to keep the data area clean on one track |
-| `"canvas_margin"` | Multi-track plots with a shared legend group           |
-
-### Gradient legend quick reference
-
-| Argument | Effect |
-|----|----|
-| `palette` | `"viridis"`, `"plasma"`, `"magma"`, `"blues"`, `"reds"` |
-| `limits` | Data range the gradient spans, e.g. `c(0, 100)` |
-| `breaks = NULL` | Auto ticks via [`pretty()`](https://rdrr.io/r/base/pretty.html) (default) |
-| `breaks = 5L` | Request 5 ticks via [`pretty()`](https://rdrr.io/r/base/pretty.html) |
-| `breaks = c(0,50,100)` | Exact tick positions |
-| `orientation = "vertical"` | Tall bar with right-side axis |
-| `orientation = "horizontal"` | Wide bar with bottom axis |
+| Palette     | Colors                         |
+|-------------|--------------------------------|
+| `"viridis"` | purple, teal, yellow (default) |
+| `"plasma"`  | dark blue, magenta, yellow     |
+| `"magma"`   | black, red, cream              |
+| `"blues"`   | white to navy                  |
+| `"reds"`    | white to dark red              |

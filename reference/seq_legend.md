@@ -18,7 +18,8 @@ seq_legend(
   orientation = NULL,
   nrow = NULL,
   ncol = NULL,
-  side = NULL
+  side = NULL,
+  row_height = NULL
 )
 ```
 
@@ -80,6 +81,11 @@ seq_legend(
   target. One of `"top"`, `"bottom"`, `"left"`, `"right"`. When `NULL`,
   defaults to `"top"` for margin positions and is left `NULL` for
   `"inside"`.
+
+- row_height:
+
+  Numeric or `NULL`. Row height in text lines. When `NULL` (default),
+  rows take a fraction of the target area capped at 0.07 npc.
 
 ## Value
 

@@ -1,9 +1,9 @@
 # Getting Started with SeqPlotR
 
-SeqPlotR builds genomic figures by composing a plot, tracks, and
-elements with a single `%+%` operator — modelled on ggplot2 but
-specialised for `GRanges` data. This vignette walks through the minimum
-you need to render a plot end-to-end.
+SeqPlotR builds genomic figures by composing a plot, tracks and elements
+with a single `%+%` operator. It is modelled on ggplot2 but specialised
+for `GRanges` data. This vignette covers the minimum needed to render a
+plot end-to-end.
 
 ``` r
 
@@ -66,16 +66,19 @@ the right-hand side’s class.
 
 ## A first plot
 
+The examples use simulated tumour data shipped with the package. The
+first scenario is a BFB amplicon on chr2 with 1,671 SNVs; each has a
+position and a variant allele fraction (`vaf`).
+
 ``` r
 
-win <- GRanges("chr1", IRanges(1, 1e6))
-gr  <- GRanges("chr1",
-               IRanges(start = seq(1e4, 9.9e5, length.out = 200), width = 1),
-               score = sin(seq(0, 6*pi, length.out = 200)) +
-                       rnorm(200, 0, 0.1))
+snv <- utils::read.delim(
+  system.file("extdata", "sim", "bfb", "snvs.tsv", package = "SeqPlotR"))
+gr  <- GRanges(snv$chrom, IRanges(snv$pos, width = 1), vaf = snv$vaf)
+win <- GRanges("chr2", IRanges(1.75e8, 2.05e8))
 
 p <- seq_plot() %+%
-  seq_track(data = gr, mapping = map(x = start, y = score), windows = win) %+%
+  seq_track(data = gr, mapping = map(x = start, y = vaf), windows = win) %+%
   seq_point(aesthetics = aes(color = "#205EA6", size = 0.4))
 
 p$plot()
@@ -90,16 +93,18 @@ inherits them.
 ## Layering several elements in one track
 
 `%+%` on a plot adds elements to the **most recently added track**, so
-two elements in a row draw on top of each other:
+two elements in a row draw on top of each other. Here the SNV count in 1
+Mb bins is drawn as an area with a point at each bin:
 
 ``` r
 
-gr_line <- GRanges("chr1",
-                   IRanges(seq(1e4, 9.9e5, length.out = 200), width = 1),
-                   value = cumsum(rnorm(200)) * 0.05)
+in_win <- subsetByOverlaps(gr, win)
+counts <- table(floor(start(in_win) / 1e6))
+gr_cnt <- GRanges("chr2", IRanges(as.integer(names(counts)) * 1e6 + 5e5, width = 1),
+                  n = as.integer(counts))
 
 p <- seq_plot() %+%
-  seq_track(data = gr_line, mapping = map(x = start, y = value), windows = win) %+%
+  seq_track(data = gr_cnt, mapping = map(x = start, y = n), windows = win) %+%
   seq_area(aesthetics = aes(fill = "#92BFDB", color = "#205EA6", baseline = 0)) %+%
   seq_point(aesthetics = aes(color = "#205EA6", size = 0.3))
 
@@ -112,20 +117,27 @@ p$plot()
 
 `%|%` and `%__%` are convenience aliases for `%+%` that set
 `direction = "right"` or `direction = "under"` on the track they
-introduce:
+introduce. Below, a second scenario (chromothripsis with BFB on chr4)
+shows copy-number segments above the SNVs of the same region:
 
 ``` r
 
-gr_a <- GRanges("chr1", IRanges(seq(1e4, 9.9e5, length.out = 100), width = 1),
-                score = rnorm(100))
-gr_b <- GRanges("chr1", IRanges(seq(1e4, 9.9e5, length.out = 100), width = 1),
-                score = rexp(100, rate = 0.5))
+seg <- utils::read.delim(
+  system.file("extdata", "sim", "ct_bfb", "segments.tsv", package = "SeqPlotR"))
+snv4 <- utils::read.delim(
+  system.file("extdata", "sim", "ct_bfb", "snvs.tsv", package = "SeqPlotR"))
+
+gr_a <- GRanges(seg$chrom, IRanges(seg$start, seg$end), cn = seg$cn)
+gr_b <- GRanges(snv4$chrom, IRanges(snv4$pos, width = 1), vaf = snv4$vaf)
+win4 <- GRanges("chr4", IRanges(5.8e7, 1.24e8))
 
 p <- seq_plot() %|%
-  seq_track(data = gr_a, mapping = map(x = start, y = score),
-            windows = win, track_id = "A") %+% seq_line(aesthetics = aes(color = "#205EA6")) %__%
-  seq_track(data = gr_b, mapping = map(x = start, y = score),
-            windows = win, track_id = "B") %+% seq_area(aesthetics = aes(fill = "#F9AE77"))
+  seq_track(data = gr_a, mapping = map(x = start, x_end = end, y = cn, y_end = cn),
+            windows = win4, track_id = "CN") %+%
+  seq_segment(aesthetics = aes(color = "#205EA6", linewidth = 2)) %__%
+  seq_track(data = gr_b, mapping = map(x = start, y = vaf),
+            windows = win4, track_id = "SNV") %+%
+  seq_point(aesthetics = aes(color = "#AF3029", size = 0.4))
 
 p$plot()
 ```
@@ -135,13 +147,19 @@ p$plot()
 ## Printing
 
 `seq_plot` carries an S3 `print` method, so a bare expression in a
-script or knitr chunk auto-renders — `p$plot()` is equivalent.
+script or knitr chunk auto-renders. `p$plot()` is equivalent.
 
 ## Where to go next
 
-- [`vignette("patchwork-layouts", "SeqPlotR")`](http://andrewlynch.io/SeqPlotR/articles/patchwork-layouts.md)
-  — multi-cell layouts with a layout string.
-- [`vignette("wrappers", "SeqPlotR")`](http://andrewlynch.io/SeqPlotR/articles/wrappers.md)
-  — higher-level wrappers (`seq_copynumber`, `seq_hic`, `seq_chip`, …).
-- [`vignette("links", "SeqPlotR")`](http://andrewlynch.io/SeqPlotR/articles/links.md)
-  — cross-track arcs, arches, synteny, and zoom links.
+- [`vignette("elements", "SeqPlotR")`](http://andrewlynch.io/SeqPlotR/articles/elements.md):
+  every drawable element.
+- [`vignette("aesthetics", "SeqPlotR")`](http://andrewlynch.io/SeqPlotR/articles/aesthetics.md):
+  themes, axes, scales and titles.
+- [`vignette("layouts", "SeqPlotR")`](http://andrewlynch.io/SeqPlotR/articles/layouts.md):
+  windows, margins, sizing and patchwork layouts.
+- [`vignette("links", "SeqPlotR")`](http://andrewlynch.io/SeqPlotR/articles/links.md):
+  arcs, arches, SV reconstruction, synteny, zoom and highlights.
+- [`vignette("legends", "SeqPlotR")`](http://andrewlynch.io/SeqPlotR/articles/legends.md):
+  manual and automatic legends.
+- [`vignette("genomic-data", "SeqPlotR")`](http://andrewlynch.io/SeqPlotR/articles/genomic-data.md):
+  wrappers, Hi-C and file connections.
