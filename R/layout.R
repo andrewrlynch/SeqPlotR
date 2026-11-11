@@ -375,6 +375,7 @@
       yplot_range         = yplot_range_w,
       xplot_range2        = xplot_range2_w,
       yplot_range2        = yplot_range2_w,
+      y_transform         = track$scale_y$transform,
       x_oob               = x_oob,
       y_oob               = y_oob,
       x_oob2              = x_oob2,

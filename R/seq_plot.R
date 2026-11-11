@@ -689,6 +689,18 @@ SeqPlotR6 <- R6::R6Class("SeqPlot",
           }
 
           for (spec in specs_to_draw) {
+            # 2D colour keys: inside and track_margin here, canvas_margin in Phase 2
+            if (inherits(spec, "SeqLegend2DSpec")) {
+              if (spec$position == "inside") {
+                p <- layout_track[[1]]$inner %||% layout_track[[1]]$full
+                .draw_legend_2d(spec, p)
+              } else if (spec$position == "track_margin") {
+                margin_rect <- self$layout$trackMarginBounds[[key]][[spec$side %||% "right"]]
+                if (!is.null(margin_rect)) .draw_legend_2d(spec, margin_rect)
+              }
+              next
+            }
+
             # Normalise bare LegendKey / list-of-LegendKey to SeqLegendSpec
             if (inherits(spec, "LegendKey")) {
               spec <- seq_legend(spec)
@@ -730,6 +742,7 @@ SeqPlotR6 <- R6::R6Class("SeqPlot",
 
       # --- Phase 2: canvas_margin (aggregated, one draw per side) ---
       canvas_entries <- .collect_canvas_legend_specs(all_trks)
+      y_bottom <- list()
 
       if (length(canvas_entries) > 0L) {
         for (side in c("top", "bottom", "left", "right")) {
@@ -744,9 +757,23 @@ SeqPlotR6 <- R6::R6Class("SeqPlot",
 
           canvas_rect <- self$layout$canvasMarginBounds[[side]]
           if (!is.null(canvas_rect)) {
-            .draw_legend_canvas_margin(merged_spec, canvas_rect)
+            res <- .draw_legend_canvas_margin(merged_spec, canvas_rect)
+            if (is.list(res)) y_bottom[[side]] <- res$y_bottom
           }
         }
+      }
+
+      # --- Phase 2b: canvas_margin 2D keys, below the key block of the side ---
+      drawn_2d <- character()
+      for (entry in .collect_canvas_2d_specs(all_trks)) {
+        side <- entry$spec$side %||% "right"
+        canvas_rect <- self$layout$canvasMarginBounds[[side]]
+        if (is.null(canvas_rect)) next
+        top <- if (side %in% drawn_2d) NULL
+               else if (!is.null(y_bottom[[side]])) y_bottom[[side]] - 0.03
+               else NULL
+        .draw_legend_2d(entry$spec, canvas_rect, top = top)
+        drawn_2d <- c(drawn_2d, side)
       }
 
       invisible()

@@ -1,6 +1,6 @@
 # ── SeqLinkR6 ────────────────────────────────────────────────────────────────
 #
-# Internal R6 base class for cross-track and within-track link elements
+# Exported R6 base class for cross-track and within-track link elements
 # (arcs, arches, strings, syntenies, zooms). Inherits from SeqElementR6 and
 # adds:
 #   * `t0`, `t1`              — track identifiers for the two anchors
@@ -14,11 +14,14 @@
 
 #' SeqLink R6 base class
 #'
-#' Internal R6 generator for cross-track and within-track link elements.
-#' Extends [`SeqElementR6`] with track identifiers and a pair of anchor
-#' GRanges synthesised from the resolved `map()` fields.
+#' R6 generator for cross-track and within-track link elements, exported
+#' for subclassing. Extends [`SeqElementR6`] with track identifiers and a
+#' pair of anchor GRanges synthesised from the resolved `map()` fields.
+#' Subclasses implement `prep(layout_all_tracks, track_windows_list,
+#' plot_track_index)` and `draw()`; [seq_to_canvas()] maps data values into
+#' any track's panel.
 #'
-#' @keywords internal
+#' @export
 SeqLinkR6 <- R6::R6Class("SeqLink",
   inherit = SeqElementR6,
   public = list(
@@ -34,6 +37,9 @@ SeqLinkR6 <- R6::R6Class("SeqLink",
     #' @field layer Draw layer: `"above"` (after track elements, the default)
     #'   or `"below"` (before any track element).
     layer      = "above",
+    #' @field anchor1_missing Logical per row, set by `resolve()`: `TRUE`
+    #'   where `x1` or `chrom1` is `NA` and anchor 1 falls back to anchor 0.
+    anchor1_missing = NULL,
 
     #' @description Construct a new SeqLinkR6.
     #' @param data Optional `GRanges` or `data.frame`. A single argument
@@ -64,7 +70,9 @@ SeqLinkR6 <- R6::R6Class("SeqLink",
     #' @description Resolve the mapping against the effective `data`, then
     #'   synthesise `anchor0_gr` and `anchor1_gr` from the resolved fields.
     #'   Errors if `x0` or `x1` is missing, or if `chrom0`/`chrom1` cannot
-    #'   be derived (only auto-fillable for GRanges `data`).
+    #'   be derived (only auto-fillable for GRanges `data`). Rows with an
+    #'   `NA` `x1` or `chrom1` take anchor 0 as anchor 1 and are flagged in
+    #'   `anchor1_missing`.
     #' @param track_data Optional `GRanges`/`data.frame` from the parent
     #'   track (used as a fallback when the link has no own `data`).
     #' @param track_mapping Optional `SeqMap` from the parent track.
@@ -75,6 +83,7 @@ SeqLinkR6 <- R6::R6Class("SeqLink",
       eff_data <- self$resolved$.data
       self$anchor0_gr <- NULL
       self$anchor1_gr <- NULL
+      self$anchor1_missing <- NULL
       if (is.null(eff_data)) return(invisible(self))
 
       n <- if (is.data.frame(eff_data)) nrow(eff_data) else length(eff_data)
@@ -107,6 +116,15 @@ SeqLinkR6 <- R6::R6Class("SeqLink",
       x0_v      <- .vec(x0_v,      n); x1_v      <- .vec(x1_v,      n)
       chrom0_v  <- .vec(chrom0_v,  n); chrom1_v  <- .vec(chrom1_v,  n)
       strand0_v <- .vec(strand0_v, n); strand1_v <- .vec(strand1_v, n)
+
+      # an NA second anchor collapses onto the first (single-anchor rows)
+      miss1 <- is.na(x1_v) | is.na(chrom1_v)
+      self$anchor1_missing <- miss1
+      if (any(miss1)) {
+        x1_v[miss1]      <- x0_v[miss1]
+        chrom1_v[miss1]  <- chrom0_v[miss1]
+        strand1_v[miss1] <- strand0_v[miss1]
+      }
 
       self$anchor0_gr <- GenomicRanges::GRanges(
         seqnames = chrom0_v,

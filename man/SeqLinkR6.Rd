@@ -4,59 +4,57 @@
 \alias{SeqLinkR6}
 \title{SeqLink R6 base class}
 \description{
-SeqLink R6 base class
-
-SeqLink R6 base class
+R6 generator for cross-track and within-track link elements, exported
+for subclassing. Extends \code{\link{SeqElementR6}} with track identifiers and a
+pair of anchor GRanges synthesised from the resolved \code{map()} fields.
+Subclasses implement \code{prep(layout_all_tracks, track_windows_list, plot_track_index)} and \code{draw()}; \code{\link[=seq_to_canvas]{seq_to_canvas()}} maps data values into
+any track's panel.
 }
-\details{
-Internal R6 generator for cross-track and within-track link elements.
-Extends \code{\link{SeqElementR6}} with track identifiers and a pair of anchor
-GRanges synthesised from the resolved \code{map()} fields.
-}
-\keyword{internal}
 \section{Super class}{
-\code{SeqPlotR::SeqElement} -> \code{SeqLink}
+\code{SeqElement} -> \code{SeqLink}
 }
 \section{Public fields}{
-\if{html}{\out{<div class="r6-fields">}}
-\describe{
-\item{\code{t0}}{\code{track_id} (or integer index) of the first anchor's track.}
+  \if{html}{\out{<div class="r6-fields">}}
+  \describe{
+    \item{\code{t0}}{\code{track_id} (or integer index) of the first anchor's track.}
 
-\item{\code{t1}}{\code{track_id} (or integer index) of the second anchor's track.}
+    \item{\code{t1}}{\code{track_id} (or integer index) of the second anchor's track.}
 
-\item{\code{anchor0_gr}}{Synthetic point GRanges for anchor 0, populated by
+    \item{\code{anchor0_gr}}{Synthetic point GRanges for anchor 0, populated by
 \code{resolve()} from the resolved \code{chrom0}, \code{x0}, and \code{strand0} fields.}
 
-\item{\code{anchor1_gr}}{Synthetic point GRanges for anchor 1.}
-}
-\if{html}{\out{</div>}}
+    \item{\code{anchor1_gr}}{Synthetic point GRanges for anchor 1.}
+
+    \item{\code{anchor1_missing}}{Logical per row, set by \code{resolve()}: \code{TRUE}
+where \code{x1} or \code{chrom1} is \code{NA} and anchor 1 falls back to anchor 0.}
+  }
+  \if{html}{\out{</div>}}
 }
 \section{Methods}{
 \subsection{Public methods}{
-\itemize{
-\item \href{#method-SeqLink-new}{\code{SeqLinkR6$new()}}
-\item \href{#method-SeqLink-resolve}{\code{SeqLinkR6$resolve()}}
-\item \href{#method-SeqLink-prep}{\code{SeqLinkR6$prep()}}
-\item \href{#method-SeqLink-.resolve_track_ref}{\code{SeqLinkR6$.resolve_track_ref()}}
-\item \href{#method-SeqLink-clone}{\code{SeqLinkR6$clone()}}
+  \itemize{
+    \item \href{#method-SeqLink-initialize}{\code{SeqLink$new()}}
+    \item \href{#method-SeqLink-resolve}{\code{SeqLink$resolve()}}
+    \item \href{#method-SeqLink-prep}{\code{SeqLink$prep()}}
+    \item \href{#method-SeqLink-.resolve_track_ref}{\code{SeqLink$.resolve_track_ref()}}
+    \item \href{#method-SeqLink-clone}{\code{SeqLink$clone()}}
+  }
 }
-}
-\if{html}{\out{
-<details open><summary>Inherited methods</summary>
+\if{html}{\out{<details open><summary>Inherited methods</summary>
 <ul>
-<li><span class="pkg-link" data-pkg="SeqPlotR" data-topic="SeqElement" data-id=".infer_scale_y"><a href='../../SeqPlotR/html/SeqElement.html#method-SeqElement-.infer_scale_y'><code>SeqPlotR::SeqElement$.infer_scale_y()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="SeqPlotR" data-topic="SeqElement" data-id="collect_legend_keys"><a href='../../SeqPlotR/html/SeqElement.html#method-SeqElement-collect_legend_keys'><code>SeqPlotR::SeqElement$collect_legend_keys()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="SeqPlotR" data-topic="SeqElement" data-id="draw"><a href='../../SeqPlotR/html/SeqElement.html#method-SeqElement-draw'><code>SeqPlotR::SeqElement$draw()</code></a></span></li>
+  <li><code>SeqElement$.infer_scale_y()</code></li>
+  <li><code>SeqElement$collect_legend_keys()</code></li>
+  <li><code>SeqElement$draw()</code></li>
 </ul>
-</details>
-}}
+</details>}}
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-SeqLink-new"></a>}}
-\if{latex}{\out{\hypertarget{method-SeqLink-new}{}}}
-\subsection{Method \code{new()}}{
-Construct a new SeqLinkR6.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{SeqLinkR6$new(
+\if{html}{\out{<a id="method-SeqLink-initialize"></a>}}
+\if{latex}{\out{\hypertarget{method-SeqLink-initialize}{}}}
+\subsection{\code{SeqLink$new()}}{
+  Construct a new SeqLinkR6.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{SeqLink$new(
   data = NULL,
   mapping = NULL,
   t0 = NULL,
@@ -65,121 +63,122 @@ Construct a new SeqLinkR6.
   legend = NULL,
   show_legend = TRUE,
   ...
-)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{data}}{Optional \code{GRanges} or \code{data.frame}. A single argument
+)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{data}}{Optional \code{GRanges} or \code{data.frame}. A single argument
 carries both anchors; there is no \code{data2}.}
-
-\item{\code{mapping}}{Optional \code{SeqMap}. Must define \code{x0} and \code{x1} (and,
+      \item{\code{mapping}}{Optional \code{SeqMap}. Must define \code{x0} and \code{x1} (and,
 for data.frame \code{data}, \code{chrom0} and \code{chrom1}).}
-
-\item{\code{t0, t1}}{Track identifiers (string or integer index). Locked to
+      \item{\code{t0, t1}}{Track identifiers (string or integer index). Locked to
 the parent track when added inside a \code{\link[=seq_track]{seq_track()}} via \verb{\%+\%}.}
-
-\item{\code{aesthetics}}{Optional \code{SeqAes}.}
-
-\item{\code{legend}}{Optional \code{LegendKey} or list of \code{LegendKey} objects.}
-
-\item{\code{show_legend}}{Logical. Set to \code{FALSE} to suppress legend output.}
-
-\item{\code{...}}{Unused — accepted so subclasses can pass extra arguments.}
+      \item{\code{aesthetics}}{Optional \code{SeqAes}.}
+      \item{\code{legend}}{Optional \code{LegendKey} or list of \code{LegendKey} objects.}
+      \item{\code{show_legend}}{Logical. Set to \code{FALSE} to suppress legend output.}
+      \item{\code{...}}{Unused — accepted so subclasses can pass extra arguments.}
+    }
+    \if{html}{\out{</div>}}
+  }
 }
-\if{html}{\out{</div>}}
-}
-}
+
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-SeqLink-resolve"></a>}}
 \if{latex}{\out{\hypertarget{method-SeqLink-resolve}{}}}
-\subsection{Method \code{resolve()}}{
-Resolve the mapping against the effective \code{data}, then
+\subsection{\code{SeqLink$resolve()}}{
+  Resolve the mapping against the effective \code{data}, then
 synthesise \code{anchor0_gr} and \code{anchor1_gr} from the resolved fields.
 Errors if \code{x0} or \code{x1} is missing, or if \code{chrom0}/\code{chrom1} cannot
-be derived (only auto-fillable for GRanges \code{data}).
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{SeqLinkR6$resolve(track_data = NULL, track_mapping = NULL)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{track_data}}{Optional \code{GRanges}/\code{data.frame} from the parent
+be derived (only auto-fillable for GRanges \code{data}). Rows with an
+\code{NA} \code{x1} or \code{chrom1} take anchor 0 as anchor 1 and are flagged in
+\code{anchor1_missing}.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{SeqLink$resolve(track_data = NULL, track_mapping = NULL)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{track_data}}{Optional \code{GRanges}/\code{data.frame} from the parent
 track (used as a fallback when the link has no own \code{data}).}
+      \item{\code{track_mapping}}{Optional \code{SeqMap} from the parent track.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    The link, invisibly.
+  }
+}
 
-\item{\code{track_mapping}}{Optional \code{SeqMap} from the parent track.}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-The link, invisibly.
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-SeqLink-prep"></a>}}
 \if{latex}{\out{\hypertarget{method-SeqLink-prep}{}}}
-\subsection{Method \code{prep()}}{
-Override in subclasses. Default implementation errors.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{SeqLinkR6$prep(layout_all_tracks, track_windows_list, plot_track_index = NULL)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{layout_all_tracks}}{Named list of panel bounds keyed by \code{track_id}.}
-
-\item{\code{track_windows_list}}{Named list of \code{GRanges} windows keyed by
+\subsection{\code{SeqLink$prep()}}{
+  Override in subclasses. Default implementation errors.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{SeqLink$prep(layout_all_tracks, track_windows_list, plot_track_index = NULL)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{layout_all_tracks}}{Named list of panel bounds keyed by \code{track_id}.}
+      \item{\code{track_windows_list}}{Named list of \code{GRanges} windows keyed by
 \code{track_id}.}
-
-\item{\code{plot_track_index}}{Optional integer index of the parent track,
+      \item{\code{plot_track_index}}{Optional integer index of the parent track,
 used only to set defaults for within-track links.}
+    }
+    \if{html}{\out{</div>}}
+  }
 }
-\if{html}{\out{</div>}}
-}
-}
+
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-SeqLink-.resolve_track_ref"></a>}}
 \if{latex}{\out{\hypertarget{method-SeqLink-.resolve_track_ref}{}}}
-\subsection{Method \code{.resolve_track_ref()}}{
-Look up a track reference (\code{track_id} string or integer
+\subsection{\code{SeqLink$.resolve_track_ref()}}{
+  Look up a track reference (\code{track_id} string or integer
 index) in \code{layout_all_tracks} and return its panel-bounds list.
 Errors with a clear message when the reference cannot be resolved.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{SeqLinkR6$.resolve_track_ref(ref, layout_all_tracks)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{ref}}{A \code{track_id} (character) or integer index.}
-
-\item{\code{layout_all_tracks}}{Named list of per-track panel bounds (the
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{SeqLink$.resolve_track_ref(ref, layout_all_tracks)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{ref}}{A \code{track_id} (character) or integer index.}
+      \item{\code{layout_all_tracks}}{Named list of per-track panel bounds (the
 \code{panelBounds} produced by \code{\link{SeqPlotR6}}'s \code{layoutGrid()}).}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    The selected track's panel-bounds list.
+  }
 }
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-The selected track's panel-bounds list.
-}
-}
+
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-SeqLink-clone"></a>}}
 \if{latex}{\out{\hypertarget{method-SeqLink-clone}{}}}
-\subsection{Method \code{clone()}}{
-The objects of this class are cloneable with this method.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{SeqLinkR6$clone(deep = FALSE)}\if{html}{\out{</div>}}
+\subsection{\code{SeqLink$clone()}}{
+  The objects of this class are cloneable with this method.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{SeqLink$clone(deep = FALSE)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{deep}}{Whether to make a deep clone.}
+    }
+    \if{html}{\out{</div>}}
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{deep}}{Whether to make a deep clone.}
-}
-\if{html}{\out{</div>}}
-}
-}
 }

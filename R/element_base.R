@@ -149,12 +149,17 @@
 
 #' SeqElement R6 base class
 #'
-#' Internal R6 generator for the base class of every drawable element.
-#' Subclasses override `prep()` and `draw()`. Not user-facing — concrete
-#' elements expose snake_case constructors (e.g. `seq_point()`) defined in
-#' their own files.
+#' R6 generator for the base class of every drawable element. Concrete
+#' elements expose snake_case constructors (e.g. `seq_point()`); the generator
+#' is exported so that other packages can subclass it. Subclasses override
+#' `prep()` (resolve mappings and fill `coordCanvas` with canvas npc values)
+#' and `draw()` (grid calls only).
 #'
-#' @keywords internal
+#' When the parent track's `scale_y` carries a `transform` (see
+#' [seq_scale_count()]), `resolve()` applies it to every numeric resolved
+#' field named in `y_fields`, for elements on the primary y axis.
+#'
+#' @export
 SeqElementR6 <- R6::R6Class("SeqElement",
   public = list(
     #' @field data GRanges — element's own data (overrides track data when set).
@@ -181,6 +186,12 @@ SeqElementR6 <- R6::R6Class("SeqElement",
     #'   Only consulted when `legend` is `NULL`. Users should not set this
     #'   directly — use the `legend` field instead.
     auto_legend = NULL,
+    #' @field y_transform Function or `NULL`. Transform of the parent track's
+    #'   primary y scale, set when the element is added to a track.
+    y_transform = NULL,
+    #' @field y_fields Character. Resolved fields in y axis units that receive
+    #'   `y_transform`. Subclasses override this with their own y fields.
+    y_fields    = c("y", "y_end", "y_min", "y_max", "y0", "y1", "height"),
 
     #' @description Construct a new SeqElementR6.
     #' @param data Optional `GRanges` for the element.
@@ -237,6 +248,13 @@ SeqElementR6 <- R6::R6Class("SeqElement",
       ay <- self$resolved[["axis.y"]]
       self$resolved$axis_x <- .normalize_axis_selector(ax, which = "x")
       self$resolved$axis_y <- .normalize_axis_selector(ay, which = "y")
+      # primary y scale transform; resolved values are recomputed on every call
+      if (is.function(self$y_transform) && self$resolved$axis_y == 1L) {
+        for (f in intersect(self$y_fields, names(self$resolved))) {
+          if (is.numeric(self$resolved[[f]]))
+            self$resolved[[f]] <- self$y_transform(self$resolved[[f]])
+        }
+      }
       invisible(self)
     },
 
@@ -281,6 +299,7 @@ SeqElementR6 <- R6::R6Class("SeqElement",
 
       cls <- class(self)[1]
       leg <- self$legend
+      if (inherits(leg, "SeqLegend2DSpec")) return(NULL)
 
       if (inherits(leg, "LegendKey")) {
         return(list(list(

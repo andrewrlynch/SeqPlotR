@@ -257,6 +257,59 @@ seq_scale_continuous <- function(limits = NULL, n_breaks = 5,
   )
 }
 
+#' Count position scale with an optional pseudo-log transform
+#'
+#' Builds a continuous y scale for copy-number style counts with integer tick
+#' labels. In log mode values up to 1 stay linear and larger values map to
+#' `1 + log2(v)`, so ticks fall at 0, 1, 2, 4, 8, ... When a track uses this
+#' scale, elements added to it transform their mapped y fields (see the
+#' `y_fields` field of [`SeqElementR6`]) before mapping to the canvas.
+#' Constant aesthetics such as `aes(height = )` are not transformed.
+#'
+#' @param max Largest count to show. Values below 1 are raised to 1.
+#' @param log Logical. Use the pseudo-log transform. Default `max > 8`.
+#' @param bottom Fraction of the top value reserved below 0, so that drawings
+#'   offset beneath 0 stay visible. Default `0.018`.
+#' @param top_pad Headroom above the top tick in linear mode. Default `0.5`.
+#' @param expand Length-2 `c(mul, add)` padding, as in [seq_scale_continuous()].
+#' @param oob Out-of-bounds handling, as in [seq_scale_continuous()].
+#' @return A `SeqScaleCount` / `SeqScaleContinuous_Pos` / `SeqPositionScale`
+#'   object with extra fields `transform` and `inverse` (functions, or `NULL`
+#'   in linear mode) and `log`.
+#' @examples
+#' s <- seq_scale_count(12, log = TRUE)
+#' s$labels
+#' s$transform(12)
+#' seq_scale_count(8)$breaks
+#' @export
+seq_scale_count <- function(max, log = max > 8, bottom = 0.018, top_pad = 0.5,
+                            expand = c(0.025, 0),
+                            oob = c("exclude", "perimeter")) {
+  oob <- match.arg(oob)
+  log <- isTRUE(log)
+  max <- max(c(max, 1), na.rm = TRUE)
+  if (log) {
+    raw       <- c(0, 2^(0:max(3, ceiling(log2(max)))))
+    transform <- function(v) ifelse(v <= 1, v, 1 + log2(pmax(v, 1)))
+    inverse   <- function(u) ifelse(u <= 1, u, 2^(u - 1))
+    breaks    <- transform(raw)
+    top       <- breaks[length(breaks)]
+  } else {
+    tt        <- ceiling(max)
+    raw       <- seq(0, tt, by = max(1, ceiling(tt / 8)))
+    transform <- NULL
+    inverse   <- NULL
+    breaks    <- raw
+    top       <- tt + top_pad
+  }
+  s <- seq_scale_continuous(limits = c(-bottom * top, top), breaks = breaks,
+                            labels = as.character(raw), expand = expand,
+                            oob = oob)
+  s[c("transform", "inverse", "log")] <- list(transform, inverse, log)
+  class(s) <- c("SeqScaleCount", class(s))
+  s
+}
+
 #' Discrete position scale
 #'
 #' Creates a categorical position scale for axes with discrete levels

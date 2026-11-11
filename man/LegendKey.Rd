@@ -35,7 +35,12 @@ Default \code{NULL}.}
 
 \item{lty}{Integer or character. Line type. Default \code{1}.}
 
-\item{...}{Additional fields stored verbatim in the \code{extra} sub-list.}
+\item{...}{Additional fields stored verbatim in the \code{extra} sub-list.
+The legend renderer reads three of them: \code{lwd} (line width of line
+keys and point borders), \code{pch} (overrides the point symbol of point
+shapes, e.g. \code{25}), and \code{draw}, a \verb{function(x0, x1, y, height)} that
+draws a custom glyph in npc units of the key cell (any \code{shape}, e.g.
+\code{"custom"}). Keys without them render as before.}
 }
 \value{
 A \code{LegendKey} S3 object (a named list with class \code{"LegendKey"}).

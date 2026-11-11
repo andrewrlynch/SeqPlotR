@@ -39,6 +39,8 @@
 #'   "canvas_margin")`, which margin to target. One of `"top"`, `"bottom"`,
 #'   `"left"`, `"right"`. When `NULL`, defaults to `"top"` for margin
 #'   positions and is left `NULL` for `"inside"`.
+#' @param row_height Numeric or `NULL`. Row height in text lines. When `NULL`
+#'   (default), rows take a fraction of the target area capped at 0.07 npc.
 #'
 #' @return A `SeqLegendSpec` S3 object (a named list with class
 #'   `"SeqLegendSpec"`).
@@ -63,7 +65,8 @@ seq_legend <- function(keys,
                        orientation = NULL,
                        nrow        = NULL,
                        ncol        = NULL,
-                       side        = NULL) {
+                       side        = NULL,
+                       row_height  = NULL) {
 
   # --- Validate keys ---
   if (inherits(keys, "LegendKey")) {
@@ -114,6 +117,10 @@ seq_legend <- function(keys,
     ))
   }
 
+  if (!is.null(row_height) &&
+      (!is.numeric(row_height) || length(row_height) != 1L || !(row_height > 0)))
+    stop("`row_height` must be a single positive number or NULL.")
+
   # --- Infer orientation when NULL ---
   resolved_orientation <- orientation
   if (is.null(resolved_orientation)) {
@@ -140,7 +147,8 @@ seq_legend <- function(keys,
     orientation = resolved_orientation,
     nrow        = nrow,
     ncol        = ncol,
-    side        = resolved_side
+    side        = resolved_side,
+    row_height  = row_height
   )
   class(spec) <- "SeqLegendSpec"
   spec
@@ -185,12 +193,19 @@ print.SeqLegendSpec <- function(x, ...) {
   alp  <- key$alpha %||% 1
   lty  <- key$lty   %||% 1
   shp  <- key$shape %||% "-"
+  ext  <- key$extra %||% list()
+
+  # extra$draw is a custom glyph function(x0, x1, y, height) in npc
+  if (is.function(ext$draw)) {
+    ext$draw(x0, x1, y, height)
+    return(invisible())
+  }
 
   if (identical(shp, "-") || identical(shp, "line")) {
     grid::grid.lines(
       x  = grid::unit(c(x0, x1), "npc"),
       y  = grid::unit(c(y,  y),  "npc"),
-      gp = grid::gpar(col = col, alpha = alp, lty = lty, lwd = 1.5)
+      gp = grid::gpar(col = col, alpha = alp, lty = lty, lwd = ext$lwd %||% 1.5)
     )
   } else if (identical(shp, "rect")) {
     grid::grid.rect(
@@ -209,12 +224,13 @@ print.SeqLegendSpec <- function(x, ...) {
       "point"    = 21L,
       21L
     )
+    if (!is.null(ext$pch)) pch <- ext$pch
     grid::grid.points(
       x    = grid::unit((x0 + x1) / 2, "npc"),
       y    = grid::unit(y, "npc"),
       pch  = pch,
       size = grid::unit(max(height * 0.8, 0.01), "npc"),
-      gp   = grid::gpar(col = col, fill = fill, alpha = alp)
+      gp   = grid::gpar(col = col, fill = fill, alpha = alp, lwd = ext$lwd)
     )
   }
 }
@@ -229,11 +245,13 @@ print.SeqLegendSpec <- function(x, ...) {
 #   key_w   Width (NPC) allocated for the key symbol. Default 0.04.
 #   key_gap Gap between key symbol right edge and label left edge. Default 0.006.
 #   row_h   Row height as a fraction of bbox height. Default 0.16.
+#           spec$row_height (text lines) overrides it when set.
 #
 # Returns a list with:
 #   $title_x, $title_y  NPC coords for the group title (NULL when spec$title is NULL).
 #   $cells              List of per-key lists:
 #                         key, label, key_x0, key_x1, y, text_x, text_y.
+#   $cell_h             Row height (NPC).
 #   $bbox               The bbox passed in.
 .legend_layout_cells <- function(spec,
                                  bbox,
@@ -270,7 +288,10 @@ print.SeqLegendSpec <- function(x, ...) {
 
   # Fixed row height: row_h fraction of bbox height, capped so keys stay visible.
   # This prevents cells from consuming the entire panel when bh is large.
-  cell_h <- max(min(row_h * bh, 0.07), 0.008)
+  cell_h <- if (!is.null(spec$row_height))
+    grid::convertHeight(grid::unit(spec$row_height, "lines"), "npc",
+                        valueOnly = TRUE)
+  else max(min(row_h * bh, 0.07), 0.008)
 
   # Usable area inside padding
   inner_x0 <- bbox$x0 + pad * bw
@@ -319,7 +340,8 @@ print.SeqLegendSpec <- function(x, ...) {
     )
   }
 
-  list(title_x = title_x, title_y = title_y, cells = cells, bbox = bbox)
+  list(title_x = title_x, title_y = title_y, cells = cells, cell_h = cell_h,
+       bbox = bbox)
 }
 
 
@@ -511,6 +533,8 @@ print.SeqLegendSpec <- function(x, ...) {
   if (length(merged_keys) == 0L) return(NULL)
 
   first <- entries[[1L]]$spec
+  # row height comes from the first spec that sets one
+  row_h <- Find(Negate(is.null), lapply(entries, function(e) e$spec$row_height))
   seq_legend(
     keys        = merged_keys,
     title       = NULL,
@@ -521,7 +545,8 @@ print.SeqLegendSpec <- function(x, ...) {
     orientation = first$orientation,
     nrow        = first$nrow,
     ncol        = first$ncol,
-    side        = side
+    side        = side,
+    row_height  = row_h
   )
 }
 
@@ -534,6 +559,9 @@ print.SeqLegendSpec <- function(x, ...) {
 #   spec              SeqLegendSpec (position = "canvas_margin")
 #   canvas_margin_rect Named list x0, x1, y0, y1
 #   key_cex, title_cex, title_col, label_col  — same as other draw helpers
+#
+# Returns invisible(list(y_bottom = <lowest cell bottom, NPC>)); y_bottom is
+# NULL when nothing was drawn.
 .draw_legend_canvas_margin <- function(spec,
                                        canvas_margin_rect,
                                        key_cex   = 0.85,
@@ -542,15 +570,17 @@ print.SeqLegendSpec <- function(x, ...) {
                                        label_col = "#1C1B1A") {
 
   if (!inherits(spec, "SeqLegendSpec"))  stop("spec must be a SeqLegendSpec.")
-  if (spec$position != "canvas_margin")  return(invisible())
+  none <- list(y_bottom = NULL)
+  if (spec$position != "canvas_margin")  return(invisible(none))
 
   r <- canvas_margin_rect
-  if ((r$x1 - r$x0) <= 0 || (r$y1 - r$y0) <= 0) return(invisible())
+  if ((r$x1 - r$x0) <= 0 || (r$y1 - r$y0) <= 0) return(invisible(none))
 
   layout <- .legend_layout_cells(spec, r)
-  if (is.null(layout)) return(invisible())
+  if (is.null(layout)) return(invisible(none))
 
   key_height <- min(0.04, (r$y1 - r$y0) * 0.4)
+  if (!is.null(spec$row_height)) key_height <- 0.75 * layout$cell_h
 
   for (cell in layout$cells) {
     if (identical(cell$key$shape, "none")) {
@@ -580,7 +610,8 @@ print.SeqLegendSpec <- function(x, ...) {
     )
   }
 
-  invisible()
+  y_mid <- vapply(layout$cells, `[[`, numeric(1), "y")
+  invisible(list(y_bottom = min(y_mid) - layout$cell_h / 2))
 }
 
 

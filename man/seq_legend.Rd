@@ -14,7 +14,8 @@ seq_legend(
   orientation = NULL,
   nrow = NULL,
   ncol = NULL,
-  side = NULL
+  side = NULL,
+  row_height = NULL
 )
 }
 \arguments{
@@ -53,6 +54,9 @@ orientation).}
 \item{side}{Character or \code{NULL}. For \code{position \%in\% c("track_margin", "canvas_margin")}, which margin to target. One of \code{"top"}, \code{"bottom"},
 \code{"left"}, \code{"right"}. When \code{NULL}, defaults to \code{"top"} for margin
 positions and is left \code{NULL} for \code{"inside"}.}
+
+\item{row_height}{Numeric or \code{NULL}. Row height in text lines. When \code{NULL}
+(default), rows take a fraction of the target area capped at 0.07 npc.}
 }
 \value{
 A \code{SeqLegendSpec} S3 object (a named list with class

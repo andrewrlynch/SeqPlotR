@@ -212,14 +212,16 @@ SeqTrackR6 <- R6::R6Class("SeqTrack",
       self$combine_y_windows    <- isTRUE(combine_y_windows)
       self$flip_x               <- isTRUE(flip_x)
       self$flip_y               <- isTRUE(flip_y)
-      if (length(elements) > 0L) self$elements <- elements
+      if (length(elements) > 0L) for (el in elements) self$addElement(el)
       self$show_legend          <- isTRUE(show_legend)
       self$window_scale         <- window_scale
     },
 
     #' @description Append an element (SeqElement or SeqLink) to this track.
+    #'   The element receives the transform of the track's primary y scale.
     #' @param elem The element to add.
     addElement = function(elem) {
+      if (inherits(elem, "SeqElement")) elem$y_transform <- self$scale_y$transform
       self$elements <- append(self$elements, list(elem))
       invisible(self)
     },

@@ -5,9 +5,10 @@
 
 #' SeqPoint R6 class
 #'
-#' Internal R6 generator backing [seq_point()]. Inherits from [`SeqElementR6`].
+#' R6 generator backing [seq_point()]. Inherits from [`SeqElementR6`].
+#' Exported so that other packages can subclass it.
 #'
-#' @keywords internal
+#' @export
 SeqPointR6 <- R6::R6Class("SeqPoint",
   inherit = SeqElementR6,
   public = list(

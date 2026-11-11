@@ -2,12 +2,13 @@
 
 #' SeqArch R6 class
 #'
-#' Internal R6 generator backing [seq_arch()]. Inherits from [`SeqLinkR6`].
-#' Same anchor pattern as [`SeqArcR6`] but draws full vertical stems from the
-#' baseline to the arch endpoints and renders partial-window stubs when only
-#' one anchor is visible.
+#' R6 generator backing [seq_arch()], exported for subclassing (for example
+#' [seq_cross_arch()]). Inherits from [`SeqLinkR6`]. Same anchor pattern as
+#' [seq_arc()] but draws full vertical stems from the baseline to the arch
+#' endpoints and renders partial-window stubs when only one anchor is
+#' visible.
 #'
-#' @keywords internal
+#' @export
 SeqArchR6 <- R6::R6Class("SeqArch",
   inherit = SeqLinkR6,
   public = list(

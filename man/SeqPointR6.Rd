@@ -4,104 +4,101 @@
 \alias{SeqPointR6}
 \title{SeqPoint R6 class}
 \description{
-SeqPoint R6 class
-
-SeqPoint R6 class
+R6 generator backing \code{\link[=seq_point]{seq_point()}}. Inherits from \code{\link{SeqElementR6}}.
+Exported so that other packages can subclass it.
 }
-\details{
-Internal R6 generator backing \code{\link[=seq_point]{seq_point()}}. Inherits from \code{\link{SeqElementR6}}.
-}
-\keyword{internal}
 \section{Super class}{
-\code{SeqPlotR::SeqElement} -> \code{SeqPoint}
+\code{SeqElement} -> \code{SeqPoint}
 }
 \section{Methods}{
 \subsection{Public methods}{
-\itemize{
-\item \href{#method-SeqPoint-new}{\code{SeqPointR6$new()}}
-\item \href{#method-SeqPoint-prep}{\code{SeqPointR6$prep()}}
-\item \href{#method-SeqPoint-draw}{\code{SeqPointR6$draw()}}
-\item \href{#method-SeqPoint-clone}{\code{SeqPointR6$clone()}}
+  \itemize{
+    \item \href{#method-SeqPoint-initialize}{\code{SeqPoint$new()}}
+    \item \href{#method-SeqPoint-prep}{\code{SeqPoint$prep()}}
+    \item \href{#method-SeqPoint-draw}{\code{SeqPoint$draw()}}
+    \item \href{#method-SeqPoint-clone}{\code{SeqPoint$clone()}}
+  }
 }
-}
-\if{html}{\out{
-<details open><summary>Inherited methods</summary>
+\if{html}{\out{<details open><summary>Inherited methods</summary>
 <ul>
-<li><span class="pkg-link" data-pkg="SeqPlotR" data-topic="SeqElement" data-id=".infer_scale_y"><a href='../../SeqPlotR/html/SeqElement.html#method-SeqElement-.infer_scale_y'><code>SeqPlotR::SeqElement$.infer_scale_y()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="SeqPlotR" data-topic="SeqElement" data-id="collect_legend_keys"><a href='../../SeqPlotR/html/SeqElement.html#method-SeqElement-collect_legend_keys'><code>SeqPlotR::SeqElement$collect_legend_keys()</code></a></span></li>
-<li><span class="pkg-link" data-pkg="SeqPlotR" data-topic="SeqElement" data-id="resolve"><a href='../../SeqPlotR/html/SeqElement.html#method-SeqElement-resolve'><code>SeqPlotR::SeqElement$resolve()</code></a></span></li>
+  <li><code>SeqElement$.infer_scale_y()</code></li>
+  <li><code>SeqElement$collect_legend_keys()</code></li>
+  <li><code>SeqElement$resolve()</code></li>
 </ul>
-</details>
-}}
+</details>}}
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-SeqPoint-new"></a>}}
-\if{latex}{\out{\hypertarget{method-SeqPoint-new}{}}}
-\subsection{Method \code{new()}}{
-Construct a SeqPointR6.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{SeqPointR6$new(data = NULL, mapping = NULL, aesthetics = aes(), ...)}\if{html}{\out{</div>}}
+\if{html}{\out{<a id="method-SeqPoint-initialize"></a>}}
+\if{latex}{\out{\hypertarget{method-SeqPoint-initialize}{}}}
+\subsection{\code{SeqPoint$new()}}{
+  Construct a SeqPointR6.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{SeqPoint$new(data = NULL, mapping = NULL, aesthetics = aes(), ...)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{data}}{Optional \code{GRanges}.}
+      \item{\code{mapping}}{Optional \code{SeqMap}.}
+      \item{\code{aesthetics}}{Optional \code{SeqAes}.}
+      \item{\code{...}}{Unused.}
+    }
+    \if{html}{\out{</div>}}
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{data}}{Optional \code{GRanges}.}
-
-\item{\code{mapping}}{Optional \code{SeqMap}.}
-
-\item{\code{aesthetics}}{Optional \code{SeqAes}.}
-
-\item{\code{...}}{Unused.}
-}
-\if{html}{\out{</div>}}
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-SeqPoint-prep"></a>}}
 \if{latex}{\out{\hypertarget{method-SeqPoint-prep}{}}}
-\subsection{Method \code{prep()}}{
-Resolve mappings, apply auto-scales for non-concrete
+\subsection{\code{SeqPoint$prep()}}{
+  Resolve mappings, apply auto-scales for non-concrete
 color/fill/shape, clip to windows, transform genomic coordinates to
 canvas npc.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{SeqPointR6$prep(layout_track, track_windows)}\if{html}{\out{</div>}}
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{SeqPoint$prep(layout_track, track_windows)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{layout_track}}{Per-window panel metadata list.}
+      \item{\code{track_windows}}{Track's \code{windows} GRanges.}
+    }
+    \if{html}{\out{</div>}}
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{layout_track}}{Per-window panel metadata list.}
-
-\item{\code{track_windows}}{Track's \code{windows} GRanges.}
-}
-\if{html}{\out{</div>}}
-}
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-SeqPoint-draw"></a>}}
 \if{latex}{\out{\hypertarget{method-SeqPoint-draw}{}}}
-\subsection{Method \code{draw()}}{
-Draw points via \code{grid::grid.points()} for each window.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{SeqPointR6$draw()}\if{html}{\out{</div>}}
+\subsection{\code{SeqPoint$draw()}}{
+  Draw points via \code{grid::grid.points()} for each window.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{SeqPoint$draw()}
+    \if{html}{\out{</div>}}
+  }
 }
 
-}
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-SeqPoint-clone"></a>}}
 \if{latex}{\out{\hypertarget{method-SeqPoint-clone}{}}}
-\subsection{Method \code{clone()}}{
-The objects of this class are cloneable with this method.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{SeqPointR6$clone(deep = FALSE)}\if{html}{\out{</div>}}
+\subsection{\code{SeqPoint$clone()}}{
+  The objects of this class are cloneable with this method.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{SeqPoint$clone(deep = FALSE)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{deep}}{Whether to make a deep clone.}
+    }
+    \if{html}{\out{</div>}}
+  }
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{deep}}{Whether to make a deep clone.}
-}
-\if{html}{\out{</div>}}
-}
-}
 }

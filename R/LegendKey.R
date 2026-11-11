@@ -20,6 +20,11 @@
 #'   Default `NULL`.
 #' @param lty Integer or character. Line type. Default `1`.
 #' @param ... Additional fields stored verbatim in the `extra` sub-list.
+#'   The legend renderer reads three of them: `lwd` (line width of line
+#'   keys and point borders), `pch` (overrides the point symbol of point
+#'   shapes, e.g. `25`), and `draw`, a `function(x0, x1, y, height)` that
+#'   draws a custom glyph in npc units of the key cell (any `shape`, e.g.
+#'   `"custom"`). Keys without them render as before.
 #'
 #' @return A `LegendKey` S3 object (a named list with class `"LegendKey"`).
 #' @export
