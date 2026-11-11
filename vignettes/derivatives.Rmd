@@ -147,7 +147,7 @@ print(p %+%
 ```{r fixtures}
 root <- system.file("extdata", "rose", "derivatives", package = "SeqPlotR")
 head(list.files(root), 4)
-s <- seq_read_table_set(file.path(root, "inversion_block_concatenated"), "plot_derivatives")
+s <- seq_read_table_set(file.path(root, "inv_block"), "plot_derivatives")
 names(s)
 s$rows[, c("row_id", "kind", "label")]
 ```
@@ -157,19 +157,19 @@ s$rows[, c("row_id", "kind", "label")]
 `seq_rose_derivatives()` turns a `plot_derivatives` table set (as produced by the ROSE package) into a plot, with one track per row, junction connectors, optional ribbons and the caption. It only maps table columns onto the elements above, and the result is an ordinary `SeqPlot`.
 
 ```{r inversion, fig.height = 3.6}
-seq_rose_derivatives(file.path(root, "inversion_block_concatenated"))$plot()
+seq_rose_derivatives(file.path(root, "inv_block"))$plot()
 ```
 
 `synteny = TRUE` adds ribbons from the reference to each derivative row. Twisted ribbons show inverted segments. Window gaps follow the coordinates in the reference layout.
 
 ```{r synteny, fig.height = 3.6}
-seq_rose_derivatives(file.path(root, "chromoplexy_block_reference"), synteny = TRUE)$plot()
+seq_rose_derivatives(file.path(root, "chromoplexy_block_ref"), synteny = TRUE)$plot()
 ```
 
 Walk fixtures include loose derivative rows. `show_loose = FALSE` drops them together with the rows that continue them.
 
 ```{r loose, fig.height = 5}
-walk <- file.path(root, "sim_bfb_amplicon_cl1_cand1_walk_concatenated")
+walk <- file.path(root, "bfb_c1_walk")
 seq_rose_derivatives(walk)$plot()
 seq_rose_derivatives(walk, show_loose = FALSE)$plot()
 ```
@@ -177,14 +177,14 @@ seq_rose_derivatives(walk, show_loose = FALSE)$plot()
 Cluster fixtures add copy number tracks above the rows and draw candidate strips as arrows.
 
 ```{r cluster, fig.height = 9, fig.width = 8}
-seq_rose_derivatives(file.path(root, "chromothripsis_18piece_cluster_concatenated"),
+seq_rose_derivatives(file.path(root, "ct18_cluster"),
                      synteny = TRUE)$plot()
 ```
 
 Solid fills use the default palette, or `palette = "soft"`, or a vector named by block key. `block_colors` overrides by label, and `label_inside = TRUE` puts labels inside blocks that are wide enough.
 
 ```{r solid, fig.height = 3.6}
-seq_rose_derivatives(file.path(root, "inversion_block_concatenated"), fill = "solid",
+seq_rose_derivatives(file.path(root, "inv_block"), fill = "solid",
                      palette = "soft", label_inside = TRUE, flip_style = "minus")$plot()
 ```
 
