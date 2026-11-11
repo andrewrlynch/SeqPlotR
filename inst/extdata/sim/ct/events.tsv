@@ -1,0 +1,3 @@
+id	type	footprint	time	chrom	start	end	haplotype	cluster
+"e1"	"SV"	"chromothripsis"	0.5	"chr3"	1	198295559	"A"	"c1"
+"e2"	"GAIN"	"gain"	0.75	"chr3"	1	198295559	"A"	NA

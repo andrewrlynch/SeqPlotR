@@ -1,0 +1,5 @@
+id	type	footprint	time	chrom	start	end	haplotype	cluster
+"e1"	"LOSS"	"loss"	0.2	"chr2"	1	242193529	"B"	NA
+"e2"	"GAIN"	"gain"	0.35	"chr3"	94000001	198295559	"B"	NA
+"e3"	"WGD"	"wgd"	0.5	NA	NA	NA	NA	NA
+"e4"	"LOSS"	"loss"	0.7	"chr1"	1	121700000	"A"	NA

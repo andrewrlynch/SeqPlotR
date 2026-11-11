@@ -1,0 +1,6 @@
+id	type	footprint	time	chrom	start	end	haplotype	cluster
+"e1"	"SV"	"chromothripsis"	0.3	"chr4"	1	190214555	"A"	"c1"
+"e2"	"SV"	"bfb"	0.45	"chr4"	121998000	122000000	"A"	"c1"
+"e3"	"SV"	"bfb"	0.55	"chr4"	86642482	86644482	"A"	"c1"
+"e4"	"SV"	"bfb"	0.65	"chr4"	98067291	98069291	"A"	"c1"
+"e5"	"SV"	"bfb"	0.8	"chr4"	88642482	88644482	"A"	"c1"

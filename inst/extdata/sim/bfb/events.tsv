@@ -1,0 +1,6 @@
+id	type	footprint	time	chrom	start	end	haplotype	cluster
+"e1"	"SV"	"bfb"	0.3	"chr2"	199998000	200000000	"A"	"c1"
+"e2"	"SV"	"bfb"	0.4	"chr2"	179998001	180000001	"A"	"c1"
+"e3"	"SV"	"bfb"	0.5	"chr2"	191998000	192000000	"A"	"c1"
+"e4"	"SV"	"bfb"	0.6	"chr2"	192998000	193000000	"A"	"c1"
+"e5"	"SV"	"bfb"	0.7	"chr2"	184998001	185000001	"A"	"c1"
