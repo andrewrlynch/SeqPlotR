@@ -3,7 +3,7 @@
 Plain tab-separated files (read with `utils::read.delim`, then build `GRanges`). Chromosome names are UCSC style ("chr2", not "2"). Positions are 1-based, closed intervals. No VCF parser or ROSE dependency is needed to use them. Regenerate with `export_simdata.R` (needs ROSE loaded via devtools::load_all).
 
 ## Provenance
-Source: /Users/andrew/code/ROSE/inst/extdata/<scenario>/ (PURPLE-style simulated output). Parsed with `ROSE::read_purple(dir, sample)`, which reads `<sc>.purple.cnv.somatic.tsv`, `.purple.purity.tsv`, `.purple.sv.vcf` and `.purple.somatic.vcf.gz`. `baf` in segments.tsv comes from the raw cnv table; `truth_*` SNV columns and events.tsv come from `<sc>.truth.snvs.tsv` and `<sc>.truth.events.tsv` (simulation ground truth, not observable in real data).
+Source: the ROSE package, `inst/extdata/<scenario>/` (PURPLE-style simulated output). Parsed with `ROSE::read_purple(dir, sample)`, which reads `<sc>.purple.cnv.somatic.tsv`, `.purple.purity.tsv`, `.purple.sv.vcf` and `.purple.somatic.vcf.gz`. `baf` in segments.tsv comes from the raw cnv table; `truth_*` SNV columns and events.tsv come from `<sc>.truth.snvs.tsv` and `<sc>.truth.events.tsv` (simulation ground truth, not observable in real data).
 
 | dir | ROSE scenario |
 |-----|---------------|
