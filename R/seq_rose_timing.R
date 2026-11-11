@@ -1,6 +1,6 @@
 # ROSE timing adapter ----
 
-# default palettes, merged with the user palette by modifyList
+# default palettes, merged with the user palette element-wise
 .timing_palette <- function() {
   list(
     sv = c(DEL = "#E69F00", DUP = "#009E73", h2hINV = "#7B3294", t2tINV = "#C2A5CF",
@@ -87,7 +87,14 @@ seq_rose_timing <- function(x, layout = c("arches", "order", "heatmap", "poset")
   poset_view <- match.arg(poset_view)
   tb <- seq_read_table_set(x, "plot_timing", supported = 1L, required = .timing_required)
   tb <- lapply(tb[names(.timing_required)], as.data.frame, stringsAsFactors = FALSE)
-  pal <- utils::modifyList(.timing_palette(), as.list(palette))
+  pal <- .timing_palette()
+  # named vectors merge element-wise over the defaults, other entries replace them
+  for (k in names(palette)) {
+    u <- palette[[k]]
+    pal[[k]] <- if (is.atomic(u) && !is.null(names(u)) && is.atomic(pal[[k]]) && !is.null(names(pal[[k]]))) {
+      replace(pal[[k]], names(u), u)
+    } else if (is.list(u) && is.list(pal[[k]])) utils::modifyList(pal[[k]], u) else u
+  }
   st <- tb$settings[1, , drop = FALSE]
   na0 <- function(v) v[!is.na(v)]
 
