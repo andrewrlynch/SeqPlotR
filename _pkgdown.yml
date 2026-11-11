@@ -2,3 +2,13 @@ url: http://andrewlynch.io/SeqPlotR/
 template:
   bootstrap: 5
 
+articles:
+  - title: Guides
+    contents:
+      - getting-started
+      - elements
+      - aesthetics
+      - layouts
+      - links
+      - legends
+      - genomic-data

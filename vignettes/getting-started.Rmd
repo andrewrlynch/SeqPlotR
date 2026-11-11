@@ -26,10 +26,7 @@ set.seed(1)
 img { max-width: 100%; height: auto; }
 ```
 
-SeqPlotR builds genomic figures by composing a plot, tracks, and
-elements with a single `%+%` operator — modelled on ggplot2 but
-specialised for `GRanges` data. This vignette walks through the
-minimum you need to render a plot end-to-end.
+SeqPlotR builds genomic figures by composing a plot, tracks and elements with a single `%+%` operator. It is modelled on ggplot2 but specialised for `GRanges` data. This vignette covers the minimum needed to render a plot end-to-end.
 
 ```{r load}
 library(SeqPlotR)
@@ -111,14 +108,13 @@ p$plot()
 
 ## Printing
 
-`seq_plot` carries an S3 `print` method, so a bare expression in a
-script or knitr chunk auto-renders — `p$plot()` is equivalent.
+`seq_plot` carries an S3 `print` method, so a bare expression in a script or knitr chunk auto-renders. `p$plot()` is equivalent.
 
 ## Where to go next
 
-- `vignette("patchwork-layouts", "SeqPlotR")` — multi-cell layouts
-  with a layout string.
-- `vignette("wrappers", "SeqPlotR")` — higher-level wrappers
-  (`seq_copynumber`, `seq_hic`, `seq_chip`, ...).
-- `vignette("links", "SeqPlotR")` — cross-track arcs, arches,
-  synteny, and zoom links.
+- `vignette("elements", "SeqPlotR")`: every drawable element.
+- `vignette("aesthetics", "SeqPlotR")`: themes, axes, scales and titles.
+- `vignette("layouts", "SeqPlotR")`: windows, margins, sizing and patchwork layouts.
+- `vignette("links", "SeqPlotR")`: arcs, arches, SV reconstruction, synteny, zoom and highlights.
+- `vignette("legends", "SeqPlotR")`: manual and automatic legends.
+- `vignette("genomic-data", "SeqPlotR")`: wrappers, Hi-C and file connections.

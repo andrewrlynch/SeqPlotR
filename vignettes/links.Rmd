@@ -1,11 +1,11 @@
 ---
-title: "SeqPlotR Links: Arches, SV Reconstruction, and Cross-Track Connectors"
+title: "Links: Arches, SV Reconstruction, and Cross-Track Connectors"
 output:
   rmarkdown::html_vignette:
     toc: true
     toc_depth: 2
 vignette: >
-  %\VignetteIndexEntry{SeqPlotR Links: Arches, SV Reconstruction, and Cross-Track Connectors}
+  %\VignetteIndexEntry{Links: Arches, SV Reconstruction, and Cross-Track Connectors}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -45,10 +45,6 @@ The cross-track family connects two *different* tracks:
   in two tracks.
 - `seq_zoom` — four-corner polygon projecting a region from one track
   (e.g. an overview) onto another (e.g. a detail view).
-
-The final section shows how to flip a track so that genomic position
-runs along **y**, which is how cross-track connectors naturally pair
-with orthogonal data axes.
 
 ```{r load}
 library(SeqPlotR)
@@ -296,63 +292,6 @@ seq_plot() %|%
                           chrom0 = chr1, chrom1 = chr2,
                           strand0 = strand1, strand1 = strand2),
             drawClasses = c("Inversion", "Dup/Del")) -> p
-p$plot()
-```
-
-## Combining links with other tracks
-
-Links compose with everything else. The example below stacks a
-coverage ribbon, a structural-variant `seq_recon` row, and a gene
-model track.
-
-```{r combined, fig.height = 6}
-xs        <- seq(1.05e6, 2.95e6, length.out = 80)
-mu        <- sin((xs - 1e6) / 3e5) * 0.3 + 0.5
-cov_gr    <- GRanges("chr1", IRanges(start = xs, width = 1),
-                     mean = mu, lo = mu - 0.12, hi = mu + 0.12)
-
-gene_gr <- GRanges(
-  "chr1",
-  IRanges(start = c(1.10e6, 1.30e6, 1.55e6, 1.78e6,
-                    2.05e6, 2.30e6, 2.55e6, 2.78e6),
-          width = c(1.5e5,  1.8e5,  1.5e5,  2.0e5,
-                    1.8e5,  1.5e5,  1.8e5,  1.5e5)),
-  gene_id   = c("A","A","A","A","B","B","B","B"),
-  gene_name = c("GENEA","GENEA","GENEA","GENEA",
-                "GENEB","GENEB","GENEB","GENEB"),
-  strand_col = c(rep("+", 4), rep("-", 4)),
-  feature = rep(c("UTR", "exon", "exon", "UTR"), 2),
-  color   = c(rep("#205EA6", 4), rep("#AF3029", 4))
-)
-
-seq_plot() %|%
-  seq_track(track_id = "Coverage",
-            data = cov_gr,
-            mapping = map(x = start, y_min = lo, y_max = hi),
-            windows = win,
-            track_height = 1.5) %+%
-  seq_ribbon(aesthetics = aes(fill = "#4385BE", alpha = 0.5)) %__%
-  seq_track(track_id = "SV",
-            windows = win,
-            track_height = 1.6) %+%
-  seq_recon(data = sv_tbl,
-            mapping = map(x0 = start1, x1 = start2,
-                          chrom0 = chr1, chrom1 = chr2,
-                          strand0 = strand1, strand1 = strand2)) %__%
-  seq_track(track_id = "Genes",
-            data = gene_gr,
-            mapping = map(group  = gene_id,
-                          type   = feature,
-                          strand = strand_col,
-                          label  = gene_name,
-                          color  = color),
-            windows = win,
-            track_height = 1) %+%
-  seq_gene(map(group  = gene_id,
-               type   = feature,
-               strand = strand_col,
-               label  = gene_name,
-               color  = color)) -> p
 p$plot()
 ```
 
@@ -757,47 +696,3 @@ p$plot()
 The band is narrow inside the overview (a 5 Mb window) and wide inside
 the zoomed detail (an 800 kb window covering the same region), with a
 trapezoid bridging the two.
-
-# Flipped tracks: genomic y with scalar x
-
-Elements and links are axis-agnostic — they transform resolved data
-coordinates to canvas npc without caring which axis is genomic. A
-track's orientation comes entirely from its `map()`. Write
-`map(y = start / end / mid / width)` and SeqPlotR auto-flips the
-track: y becomes a genomic axis (covering the `windows` extent) and
-x becomes a scalar data axis whose range is inferred from the
-element data. No `scale_x` / `scale_y` arguments are required.
-
-```{r genomic-y, fig.height = 4.5}
-gene_meta <- GRanges("chr1",
-  IRanges(start = seq(1.05e6, 2.95e6, length.out = 14),
-          width = 1e4),
-  log2fc = rnorm(14, 0, 1.3),
-  sig    = sample(c("up", "down", "ns"),
-                  14, replace = TRUE,
-                  prob = c(0.35, 0.35, 0.3))
-)
-up_col <- c(up = "#AF3029", down = "#205EA6", ns = "#878580")
-
-# `y = mid` is a genomic special, so SeqPlotR flips the track: the
-# y-axis becomes genomic (1–3 Mb) and the x-axis carries log2fc.
-seq_plot() %|%
-  seq_track(data = gene_meta,
-            mapping = map(x = log2fc, y = mid, color = sig),
-            windows = win, track_width = 0.6) %+%
-  seq_segment(mapping = map(x = 0, x_end = log2fc,
-                            y = mid, y_end = mid,
-                            color = sig),
-              aesthetics = aes(linewidth = 2.2)) %+%
-  seq_point(aesthetics = aes(size = 0.6)) -> p
-p$plot()
-```
-
-Each gene sits at its true genomic coordinate along the y-axis; the
-horizontal segment plus terminal point show a scalar per-gene
-statistic. Override the auto-inferred scales with explicit
-`scale_x = seq_scale_continuous(limits = ...)` or
-`scale_y = seq_scale_genomic(...)` on `seq_track()` when you need a
-fixed range; the same operator chain otherwise works in either
-orientation.
-

@@ -1,11 +1,11 @@
 ---
-title: "Hi-C Visualization"
+title: "Genomic Data: Wrappers, Hi-C, and File Connections"
 output:
   rmarkdown::html_vignette:
     toc: true
     toc_depth: 2
 vignette: >
-  %\VignetteIndexEntry{Hi-C Visualization}
+  %\VignetteIndexEntry{Genomic Data: Wrappers, Hi-C, and File Connections}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -19,34 +19,97 @@ knitr::opts_chunk$set(
   dev        = "png",
   dpi        = 192
 )
+set.seed(42)
 ```
 
 ```{css echo = FALSE}
 img { max-width: 100%; height: auto; }
 ```
 
-[`seq_hic()`](../reference/seq_hic.html) renders Hi-C contact matrices in
-four interchangeable styles. Each call produces one `seq_plot` with a
-single track in the chosen style — to combine styles or stitch
-together regions, call `seq_hic()` multiple times and compose the
-results with [`seq_resolve()`](../reference/seq_resolve.html), `%+%`,
-`%|%` or `%__%`.
+Wrapper functions assemble common genomic visualisations from the primitive elements. Each returns a `seq_plot` that can be composed further with `%+%`, `%|%`, `%__%` or `seq_resolve()`. Pass unique `track_id` values to each wrapper to avoid collisions when resolving several plots into one figure.
 
 ```{r load}
 library(SeqPlotR)
 library(GenomicRanges)
 ```
 
+# Copy number and ChIP
+
+## `seq_copynumber()`
+
+Single-sample CN scatter coloured by integer state, with an optional segmentation overlay. `cn_col` falls back through `c("cn", "copy_number", "CN", "state", "integer_cn")` and `ratio_col` through `c("log2ratio", "logR", "log2R", "ratio", "log2_ratio")`.
+
+```{r cn}
+win_cn <- GRanges(c("chr1", "chr2"), IRanges(c(1, 1), c(1e6, 1.5e6)))
+
+cn_gr <- GRanges(
+  rep(c("chr1", "chr2"), each = 150),
+  IRanges(start = c(sample(1:1e6, 150), sample(1:1.5e6, 150)), width = 5000),
+  cn        = sample(0:5, 300, replace = TRUE,
+                     prob = c(.05, .1, .55, .15, .1, .05)),
+  log2ratio = rnorm(300, 0, 0.3)
+)
+
+seg <- GRanges(c("chr1", "chr2"),
+               IRanges(c(1, 1), c(1e6, 1.5e6)),
+               seg_mean = c(0.0, -0.3))
+
+p <- seq_copynumber(cn_gr, windows = win_cn,
+                    segment_data = seg, segment_col = "seg_mean")
+p$plot()
+```
+
+## `seq_cn_heatmap()`
+
+Multi-sample CN heatmap with one row per sample and tiles coloured by CN state.
+
+```{r cn-heatmap, fig.height = 3.5}
+samples <- paste0("S", 1:5)
+cnh_gr  <- GRanges(
+  rep(c("chr1", "chr2"), each = 300),
+  IRanges(start = c(sample(1:1e6, 300, replace = TRUE),
+                    sample(1:1.5e6, 300, replace = TRUE)), width = 5000),
+  sample = sample(samples, 600, replace = TRUE),
+  cn     = sample(0:5, 600, replace = TRUE)
+)
+
+p <- seq_cn_heatmap(cnh_gr, windows = win_cn,
+                    sample_col = "sample", cn_col = "cn",
+                    sample_order = samples)
+p$plot()
+```
+
+## `seq_chip()`
+
+ChIP-style signal and peak tracks. `data` is a named list of `GRanges` (one per sample) or a single `GRanges` with a sample column.
+
+```{r chip, fig.height = 5}
+make_sig <- function(nm) {
+  g <- GRanges("chr1",
+               IRanges(sort(sample(1:1e6, 400)), width = 500),
+               score = rexp(400, rate = 0.15))
+  S4Vectors::mcols(g)$sample <- nm
+  g
+}
+sig <- list(Rad21 = make_sig("Rad21"), NippedB = make_sig("NippedB"))
+peaks <- list(Rad21   = GRanges("chr1", IRanges(sort(sample(1:1e6, 20)), width = 2000)),
+              NippedB = GRanges("chr1", IRanges(sort(sample(1:1e6, 15)), width = 2000)))
+
+p <- seq_chip(sig, peaks = peaks,
+              windows = GRanges("chr1", IRanges(1, 1e6)))
+p$plot()
+```
+
+# Hi-C
+
+`seq_hic()` renders contact matrices in four styles. Each call produces one `seq_plot` with a single track; combine styles or regions by calling it several times and composing with `seq_resolve()`.
+
 ## Synthetic data
 
-The examples below use the same Hi-C contact simulator carried over
-from `THEfunc/inst/examples/08_rotated_hic_heatmap.R`: every
-upper-triangular bin pair `(i, j)` is assigned a contact strength of
-`exp(-distance * decay_rate) * lognormal(noise)`, then symmetrised by
-mirroring `(j, i)`.
+A simple contact simulator: every upper-triangular bin pair `(i, j)` gets strength `exp(-distance * decay_rate) * lognormal(noise)`, then is mirrored to `(j, i)`.
 
 ```{r simulator}
-# Hi-C simulator (THEfunc port).
+# contact simulator
 generate_hic_matrix <- function(n_bins, decay_rate = 0.2) {
   ij    <- expand.grid(i = seq_len(n_bins), j = seq_len(n_bins))
   upper <- ij$j >= ij$i
@@ -60,7 +123,7 @@ generate_hic_matrix <- function(n_bins, decay_rate = 0.2) {
   rbind(upper_df, lower_df)
 }
 
-# Convenience: build a `seq_hic`-shaped GRanges for a single region.
+# seq_hic-shaped GRanges for a single region
 hic_region <- function(chrom, start, end, bin_size, decay = 0.2,
                        seed = NULL) {
   if (!is.null(seed)) set.seed(seed)
@@ -83,16 +146,13 @@ hic_multi <- function(regions, bin_size, decay = 0.2, base_seed = 100) {
     hic_region(r[[1]], r[[2]], r[[3]], bin_size,
                decay = decay, seed = base_seed + k)
   })
-  do.call(c, parts)
+  suppressWarnings(do.call(c, parts))
 }
 ```
 
-## The four styles at a glance
+## Styles
 
-A single 5 Mb region rendered in each of the four styles. The first
-two (`full`, `diagonal`) keep both axes genomic; the last two
-(`triangle`, `rectangle`) rotate by 45° so the y-axis becomes
-interaction distance in bp.
+`full` and `diagonal` keep both axes genomic. `triangle` and `rectangle` rotate by 45 degrees so y is interaction distance; `max_dist` caps that axis. `triangle` is the usual browser-style view, `rectangle` suits fine resolutions where only short-range contacts matter, `diagonal` drops the redundant lower triangle of `full`.
 
 ```{r styles-data}
 gr  <- hic_region("chr1", 40e6, 45e6, bin_size = 1e5, decay = 0.25,
@@ -100,51 +160,19 @@ gr  <- hic_region("chr1", 40e6, 45e6, bin_size = 1e5, decay = 0.25,
 win <- GRanges("chr1", IRanges(40e6, 45e6))
 ```
 
-### `style = "full"`
-
-```{r style-full, fig.width = 5.2, fig.height = 5}
+```{r style-grid, fig.width = 5.2, fig.height = 5}
 seq_hic(gr, windows = win, style = "full")$plot()
-```
-
-Symmetric square heatmap with genomic position on both axes. This is
-the canonical view but uses the most space — half the panel is a
-mirror of the other.
-
-### `style = "diagonal"`
-
-```{r style-diagonal, fig.width = 5.2, fig.height = 5}
 seq_hic(gr, windows = win, style = "diagonal")$plot()
 ```
 
-Same coordinate system as `"full"`, but the lower-triangular mirror
-is dropped — the diagonal is the dominant feature.
-
-### `style = "triangle"`
-
-```{r style-triangle, fig.width = 7, fig.height = 3}
+```{r style-rotated, fig.width = 7, fig.height = 3}
 seq_hic(gr, windows = win, style = "triangle")$plot()
-```
-
-45° rotation: x is genomic position, y is **interaction distance** in
-bp. The y-axis tops out at the largest distance present in the data.
-Most space-efficient — and the standard for browser-style Hi-C tracks.
-
-### `style = "rectangle"`
-
-```{r style-rectangle, fig.width = 7, fig.height = 2.5}
 seq_hic(gr, windows = win, style = "rectangle", max_dist = 2e6)$plot()
 ```
 
-The same rotation, but `max_dist` caps the distance axis. Use this
-when long-range contacts are sparse or out of scope — the visible
-rectangle is filled with the biologically interesting near-diagonal
-band.
+## Multiple regions on x
 
-## Multiple regions on the x axis
-
-`windows` accepts a multi-range `GRanges` — each range becomes its own
-side-by-side panel, sharing the same y axis. Perfect for comparing
-several loci at a glance.
+A multi-range `windows` places each range in its own panel sharing the y axis. All four styles work this way.
 
 ```{r multi-data}
 regs <- list(list("chrA", 0, 3e6),
@@ -155,54 +183,13 @@ win_multi <- GRanges(c("chrA", "chrB", "chrC"),
                      IRanges(c(1, 1, 1), c(3e6, 3e6, 3e6)))
 ```
 
-### Multi-region triangle
-
 ```{r multi-triangle, fig.width = 9, fig.height = 2.6}
 seq_hic(gr_multi, windows = win_multi, style = "triangle")$plot()
 ```
 
-Each chromosome's contact matrix in its own triangular panel. The
-distance axis is shared so distance scales remain comparable across
-panels.
+## Multiple regions on y
 
-### Multi-region rectangle
-
-```{r multi-rectangle, fig.width = 9, fig.height = 2.4}
-seq_hic(gr_multi, windows = win_multi, style = "rectangle",
-        max_dist = 1.5e6)$plot()
-```
-
-The capped distance axis makes side-by-side comparison particularly
-clean — every panel uses the same y-extent, so visual "weight"
-directly reflects contact density.
-
-### Multi-region full
-
-```{r multi-full, fig.width = 9, fig.height = 3.4}
-seq_hic(gr_multi, windows = win_multi, style = "full")$plot()
-```
-
-Each panel is the symmetric 2D matrix for that region.
-
-### Multi-region diagonal
-
-```{r multi-diagonal, fig.width = 9, fig.height = 3.4}
-seq_hic(gr_multi, windows = win_multi, style = "diagonal")$plot()
-```
-
-## Multiple regions on the y axis
-
-`y_windows` controls the genomic y-axis for the `full` and
-`diagonal` styles independently from `windows`. By default it
-mirrors `windows` (square matrix). Pass a multi-region `GRanges` to
-stack several y-axis windows vertically — each gets its own
-sub-panel with axis labels and a title naming the chromosome and
-range, and a thin horizontal separator marks the boundary.
-
-To represent inter-chromosomal contacts, the input `GRanges` carries
-an optional `j_chrom` mcols column giving the j-bin's chromosome
-(the GRanges seqname is the i-bin's chromosome). When `j_chrom` is
-absent both bins are taken to be on the same chromosome.
+`y_windows` sets the genomic y-axis for `full` and `diagonal` independently of `windows`. A multi-region `GRanges` stacks y sub-panels, each with its own axis. Inter-chromosomal contacts need a `j_chrom` mcols column giving the j-bin chromosome.
 
 ```{r multi-y-data}
 # x: chr1 (1 region). y: stacked chrA + chrB (2 regions).
@@ -239,21 +226,9 @@ seq_hic(gr_multiy,
         style     = "full")$plot()
 ```
 
-The bottom panel shows `chr1 × chrA` contacts; the top panel shows
-`chr1 × chrB`. Each y sub-panel has its own genomic scale, so the
-two pairs are directly comparable.
+## Combining windows
 
-## Combining x-axis regions into a single panel
-
-By default each x-axis region in `windows` renders as its own panel.
-Setting `combine_windows = TRUE` concatenates them into a single
-virtual panel — useful when *cross-window* contacts (e.g. an
-inter-chromosomal translocation) need to appear in one continuous
-view. Each original window keeps its own per-window axis labels and
-title, and a thin vertical separator marks the boundary.
-
-`combine_windows` is implemented at the [`seq_track()`] level, so
-this option is available to every track type — not just Hi-C.
+`combine_windows = TRUE` concatenates the x regions into one virtual panel so cross-window contacts (for example a translocation) appear in a single view. It is implemented at `seq_track()` level, so every track type supports it. `combine_y_windows` does the same on y.
 
 ```{r combine-data}
 # Two-region data: intra-chr14, intra-chr5, plus a "translocation"
@@ -302,12 +277,6 @@ win_combined <- GRanges(c("chr14", "chr5"),
                         IRanges(c(98e6, 170e6), c(100e6, 172e6)))
 ```
 
-### `combine_windows = TRUE` — triangle
-
-The two intra-chromosomal contact decays sit on either side of a
-boundary, with the cross-chromosomal "translocation" rising as a
-floating diamond between them.
-
 ```{r combine-tri, fig.width = 9, fig.height = 4.2}
 seq_hic(gr_combined,
         windows         = win_combined,
@@ -315,12 +284,6 @@ seq_hic(gr_combined,
         combine_windows = TRUE,
         palette         = "reds")$plot()
 ```
-
-### `combine_windows = TRUE` — full
-
-The same contact set as a 2D matrix. The diagonal lights up in each
-intra-chromosomal quadrant, with a bright inter-chromosomal block in
-the off-diagonal quadrants.
 
 ```{r combine-full, fig.width = 7, fig.height = 7}
 seq_hic(gr_combined,
@@ -332,13 +295,9 @@ seq_hic(gr_combined,
         palette           = "reds")$plot()
 ```
 
-## Multiple regions on both axes — composing a region grid
+## Region grids
 
-For a 2-D matrix-of-matrices view (every x-region paired with every
-y-region), build one `seq_hic()` per cell and lay them out with a
-patchwork string. This sidesteps the need for multi-region y sub-axes
-inside a single track and gives full control over per-cell sizing and
-labels.
+For a matrix-of-matrices view, build one `seq_hic()` per cell and arrange them with a layout string and `seq_resolve()`. The diagonal cells are intra-chromosomal; the off-diagonals are the asymmetric views.
 
 ```{r grid-data}
 # Two-region intra-chrom data plus a contrived "off-diagonal" view.
@@ -367,43 +326,21 @@ fig <- seq_resolve(fig, p_AA, p_AB, p_BA, p_BB)
 fig$plot()
 ```
 
-The diagonal cells (top-left, bottom-right) are intra-chromosomal
-contact maps; the off-diagonals show the asymmetric `chrA × chrB` and
-`chrB × chrA` views.
+## Flipping axes
 
-## Flipping the axes — `flip_x` / `flip_y`
-
-`seq_hic()` accepts `flip_x` and `flip_y` to mirror an axis. Tick
-labels follow the orientation, so the data and the labels stay in
-sync. The most common use is plotting a *downward-pointing* triangle
-underneath another track.
-
-### Triangle, point down
+`flip_x` and `flip_y` mirror an axis, with tick labels following. A downward triangle under another track is the common use.
 
 ```{r flip-triangle, fig.width = 7, fig.height = 3}
 seq_hic(gr, windows = win, style = "triangle",
         flip_y = TRUE)$plot()
 ```
 
-### Diagonal, lower triangle
-
-```{r flip-diagonal, fig.width = 5.2, fig.height = 5}
-seq_hic(gr, windows = win, style = "diagonal",
-        flip_y = TRUE)$plot()
-```
-
-### Full, mirrored on x
-
 ```{r flip-full, fig.width = 5.2, fig.height = 5}
 seq_hic(gr, windows = win, style = "full",
         flip_x = TRUE)$plot()
 ```
 
-### Stacking a normal triangle above a flipped one
-
-A common publication-style layout: two samples shown back-to-back,
-the second flipped so its peak meets the first's. Use `seq_resolve()`
-to compose them in one figure.
+Two samples back-to-back, the second flipped so its peak meets the first:
 
 ```{r flip-stacked, fig.width = 7, fig.height = 5}
 p_top    <- seq_hic(gr, windows = win, style = "triangle",
@@ -413,41 +350,9 @@ p_bottom <- seq_hic(gr, windows = win, style = "triangle",
 seq_resolve(seq_plot(), p_top, p_bottom)$plot()
 ```
 
-## Mixed-style figures via `seq_resolve()`
+## With annotation tracks
 
-`seq_hic()` is one call per style — but `seq_resolve()` makes it easy
-to combine several Hi-C views in a single figure. Useful when one
-style answers one question (long-range patterns via `triangle`) and
-another a different one (TAD structure via `full`).
-
-```{r mixed, fig.width = 9, fig.height = 6}
-gr <- hic_region("chr1", 40e6, 45e6, bin_size = 1e5, decay = 0.25,
-                 seed = 1)
-win <- GRanges("chr1", IRanges(40e6, 45e6))
-
-p_full <- seq_hic(gr, windows = win, style = "full",
-                  track_id = "FullView")
-p_tri  <- seq_hic(gr, windows = win, style = "triangle",
-                  track_id = "TriView")
-
-fig <- seq_resolve(seq_plot(), p_full, p_tri)
-fig$plot()
-```
-
-## Choosing a style
-
-| Style | When to reach for it |
-|-------|---------------------|
-| `full` | Detailed per-cell inspection, asymmetric regions on x and y, full symmetric matrix you want to read either direction. |
-| `diagonal` | Like `full` but with the redundant lower triangle stripped — a half-matrix view that uses the same coordinate system. |
-| `triangle` | Browser-style overview, stacking with other genomic tracks, and any time interaction distance is the question. |
-| `rectangle` | Large genomes / fine resolutions where only short-to-medium-range contacts matter. The `max_dist` cap removes noise from sparse long-range tiles and lets you compare regions on the same distance scale. |
-
-## Combining Hi-C with annotation tracks
-
-Rotated styles (`triangle`, `rectangle`) compose naturally above
-annotation tracks because they share the same x-axis. `seq_resolve()`
-or the operator chain stitches them together:
+Rotated styles share the x axis with annotation tracks, so `seq_resolve()` or the operator chain stacks them directly.
 
 ```{r genes-track, fig.width = 8, fig.height = 4.5}
 # Synthetic gene track for the same window.
@@ -468,4 +373,65 @@ p_genes <- seq_plot() %+%
                label = gene))
 
 seq_resolve(seq_plot(), p_hic, p_genes)$plot()
+```
+
+# File connections
+
+`open_bigwig()`, `open_bam()` and `open_hic()` return lightweight connection objects. Each probes the file header at construction, records a per-format `max_fetch_bp` guardrail, and exposes `$fetch(region)` to pull only the requested span. The guardrail fires before any I/O, so an overly wide span raises an error rather than loading a whole chromosome.
+
+```{r io-shape, eval = FALSE}
+bw  <- open_bigwig("path/to/signal.bw")
+bw                       # <SeqBigWig>  ...  max_fetch_bp: 50,000,000
+sig <- bw$fetch(GRanges("chr1", IRanges(1, 1e6)))   # GRanges of signal
+
+bam <- open_bam("path/to/aln.bam")
+bam$fetch(GRanges("chr1", IRanges(20363000, 20370000)))
+
+hic <- open_hic("path/to/contacts.hic", resolution = 25000)
+hic$fetch(GRanges("chr1", IRanges(1e7, 1.1e7)))
+```
+
+`open_hic()$fetch()` accepts a multi-range `region`: each range yields its own intra-region contact submatrix and the results are concatenated into one BEDPE data frame carrying `seqnames1` / `seqnames2`. The `max_fetch_bp` check applies per range (default 280 Mb).
+
+```r
+hic$fetch(GRanges(c("chr14", "chr15"),
+                  IRanges(c(98e6, 50e6), c(99e6, 51e6))))
+```
+
+```{r is-conn}
+is_seq_file_conn(list())            # FALSE
+is_seq_file_conn("path/to/file.bw") # FALSE
+```
+
+## `seq_reads()` — alignment view
+
+`seq_reads()` loads alignments from an indexed BAM at construction, packs them into rows by insert length (or start), and draws chevron polygons (right for `+`, left for `-`). Mate pairs share a row and are joined by a thin line. The `max_width` guardrail (default 100 kb) fires before any BAM I/O.
+
+```{r reads-shape, eval = FALSE}
+win  <- GRanges("chr1", IRanges(20363000, 20370000))
+reads <- seq_reads("path/to/aln.bam", win,
+                   sort_by    = "insert_length",
+                   link_mates = TRUE)
+
+seq_plot() %+%
+  (seq_track(windows = win, height = 4) %+% reads)
+```
+
+The demo below runs only when `SEQPLOTR_DEMO_BAM` points to an indexed BAM and Rsamtools and GenomicAlignments are installed.
+
+```{r reads-demo-eval, include = FALSE}
+demo_bam <- Sys.getenv("SEQPLOTR_DEMO_BAM", "")
+demo_ok  <- nzchar(demo_bam) && file.exists(demo_bam) &&
+            file.exists(paste0(demo_bam, ".bai")) &&
+            requireNamespace("Rsamtools",         quietly = TRUE) &&
+            requireNamespace("GenomicAlignments", quietly = TRUE)
+```
+
+```{r reads-demo, eval = demo_ok, fig.height = 4}
+win_reads <- GRanges("chr20", IRanges(30000000, 30050000))
+reads <- seq_reads(demo_bam, win_reads, max_reads = 500)
+
+p <- seq_plot() %+%
+  (seq_track(windows = win_reads, height = 4) %+% reads)
+p$plot()
 ```
