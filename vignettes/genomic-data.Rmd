@@ -31,6 +31,11 @@ Wrapper functions assemble common genomic visualisations from the primitive elem
 ```{r load}
 library(SeqPlotR)
 library(GenomicRanges)
+
+# simulated scenarios: copy-number segments per scenario
+sim <- function(sc, f) utils::read.delim(system.file("extdata", "sim", sc, f, package = "SeqPlotR"))
+scen <- c(bfb = "bfb", wgd = "wgd", ct = "ct", ct_bfb = "ct_bfb")
+segs <- lapply(scen, sim, f = "segments.tsv")
 ```
 
 # Copy number and ChIP
@@ -39,43 +44,41 @@ library(GenomicRanges)
 
 Single-sample CN scatter coloured by integer state, with an optional segmentation overlay. `cn_col` falls back through `c("cn", "copy_number", "CN", "state", "integer_cn")` and `ratio_col` through `c("log2ratio", "logR", "log2R", "ratio", "log2_ratio")`.
 
+The example is a simulated tumour with chromothripsis and breakage-fusion-bridge amplification on chr4. The simulation provides copy-number segments but no read-level ratios, so the points are 100 kb bins across chr4:55-125 Mb. Each bin takes the copy number of the segment containing it and a log2 ratio of `log2(cn / 2)`, the ratio expected for that copy number against a diploid reference, so copy number 2 sits at 0 and copy number 1 at -1. The segment overlay uses the same ratio computed once per segment.
+
 ```{r cn}
-win_cn <- GRanges(c("chr1", "chr2"), IRanges(c(1, 1), c(1e6, 1.5e6)))
+sg  <- segs$ct_bfb
+win_cn <- GRanges("chr4", IRanges(5.5e7, 1.25e8))
 
-cn_gr <- GRanges(
-  rep(c("chr1", "chr2"), each = 150),
-  IRanges(start = c(sample(1:1e6, 150), sample(1:1.5e6, 150)), width = 5000),
-  cn        = sample(0:5, 300, replace = TRUE,
-                     prob = c(.05, .1, .55, .15, .1, .05)),
-  log2ratio = rnorm(300, 0, 0.3)
-)
+# 100 kb bins labelled by the overlapping segment
+bin_start <- seq(5.5e7, 1.25e8 - 1e5, by = 1e5)
+bins <- GRanges("chr4", IRanges(bin_start, width = 1e5))
+seg_gr <- GRanges(sg$chrom, IRanges(sg$start, sg$end), cn = sg$cn,
+                  seg_mean = log2(sg$cn / 2))
+hit <- findOverlaps(bins, seg_gr, select = "first")
+bins$cn        <- seg_gr$cn[hit]
+bins$log2ratio <- log2(bins$cn / 2)
 
-seg <- GRanges(c("chr1", "chr2"),
-               IRanges(c(1, 1), c(1e6, 1.5e6)),
-               seg_mean = c(0.0, -0.3))
-
-p <- seq_copynumber(cn_gr, windows = win_cn,
-                    segment_data = seg, segment_col = "seg_mean")
+p <- seq_copynumber(bins, windows = win_cn,
+                    segment_data = seg_gr, segment_col = "seg_mean")
 p$plot()
 ```
 
 ## `seq_cn_heatmap()`
 
-Multi-sample CN heatmap with one row per sample and tiles coloured by CN state.
+Multi-sample CN heatmap with one row per sample and tiles coloured by CN state. The rows here are the four simulated scenarios, each covering different chromosomes: the chr2 amplicon (`bfb`), chr1-3 after genome doubling (`wgd`), chromothripsis on chr3 (`ct`) and chromothripsis with amplification on chr4 (`ct_bfb`). One window per chromosome puts every scenario on a shared chr1-chr4 layout, so each row has tiles only where that scenario has segments.
 
 ```{r cn-heatmap, fig.height = 3.5}
-samples <- paste0("S", 1:5)
-cnh_gr  <- GRanges(
-  rep(c("chr1", "chr2"), each = 300),
-  IRanges(start = c(sample(1:1e6, 300, replace = TRUE),
-                    sample(1:1.5e6, 300, replace = TRUE)), width = 5000),
-  sample = sample(samples, 600, replace = TRUE),
-  cn     = sample(0:5, 600, replace = TRUE)
-)
+cnh_gr <- do.call(c, unname(Map(function(s, nm) {
+  GRanges(s$chrom, IRanges(s$start, s$end), sample = nm, cn = s$cn)
+}, segs, names(segs))))
 
-p <- seq_cn_heatmap(cnh_gr, windows = win_cn,
+win_hm <- GRanges(paste0("chr", 1:4),
+                  IRanges(1, c(248956422, 242193529, 198295559, 190214555)))
+
+p <- seq_cn_heatmap(cnh_gr, windows = win_hm,
                     sample_col = "sample", cn_col = "cn",
-                    sample_order = samples)
+                    sample_order = names(segs))
 p$plot()
 ```
 

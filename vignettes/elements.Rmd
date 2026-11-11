@@ -36,6 +36,37 @@ library(GenomicRanges)
 win <- GRanges("chr1", IRanges(1e6, 3e6))
 ```
 
+Several examples use simulated tumour data shipped with the package: a BFB amplicon on chr2 (`bfb`), whole-genome doubling on chr1-3 (`wgd`), chromothripsis on chr3 (`ct`) and chromothripsis with BFB on chr4 (`ct_bfb`). Each scenario has copy-number segments, SVs and SNVs with a variant allele fraction (VAF).
+
+```{r sim-data}
+sim <- function(sc, f) {
+  utils::read.delim(system.file("extdata", "sim", sc, f, package = "SeqPlotR"))
+}
+seg_to_gr <- function(d) {
+  GRanges(d$chrom, IRanges(d$start, d$end),
+          cn = d$cn, cn_major = d$cn_major, cn_minor = d$cn_minor, baf = d$baf)
+}
+snv_to_gr <- function(d) {
+  GRanges(d$chrom, IRanges(d$pos, width = 1),
+          vaf = d$vaf, sbs6 = d$sbs6, mult = as.character(d$truth_mult))
+}
+
+bfb_snv <- snv_to_gr(sim("bfb", "snvs.tsv"))
+bfb_seg <- seg_to_gr(sim("bfb", "segments.tsv"))
+bfb_win <- GRanges("chr2", IRanges(1.75e8, 2.05e8))
+
+wgd_snv <- snv_to_gr(sim("wgd", "snvs.tsv"))
+
+ct_seg  <- seg_to_gr(sim("ct", "segments.tsv"))
+ct_win  <- GRanges("chr3", IRanges(9.5e7, 1.95e8))
+
+ctb_seg <- seg_to_gr(sim("ct_bfb", "segments.tsv"))
+ctb_sv  <- sim("ct_bfb", "svs.tsv")
+ctb_sv  <- GRanges(ctb_sv$chrom1, IRanges(ctb_sv$pos1, width = 1),
+                   jcn = ctb_sv$jcn, sv_type = ctb_sv$sv_type)
+ctb_win <- GRanges("chr4", IRanges(5.8e7, 1.24e8))
+```
+
 # Primitives
 
 Every primitive shares the same three-stage contract (`initialize` →
@@ -49,18 +80,16 @@ one consumes. Per-track `data` + `mapping` are inherited, so a single
 Required `map()` fields: `x`, `y`. Optional: `color`, `fill`, `size`,
 `shape`, `alpha`.
 
-```{r point, fig.height = 2.8}
-xs       <- seq(1.05e6, 2.95e6, length.out = 40)
-point_gr <- GRanges("chr1", IRanges(xs, width = 1),
-                    score = sin((xs - 1e6) / 5e5) + rnorm(40, 0, 0.12),
-                    cat   = sample(c("A", "B", "C"), 40, replace = TRUE))
+Below, each SNV from a simulated BFB amplicon on chr2 is a point at its position, with VAF on `y`, coloured by the true number of mutated copies (`mult`). SNVs inside the amplified region carry several copies.
 
-seq_plot() %|%
-  seq_track(data = point_gr,
-            mapping = map(x = start, y = score),
-            windows = win) %+%
-  seq_point(map(color = cat),
-            aesthetics = aes(size = 0.7, alpha = 0.9)) -> p
+```{r point, fig.height = 2.8}
+seq_plot(aesthetics = aes(margins = list(top = 0, right = 0.12,
+                                         bottom = 0, left = 0))) %|%
+  seq_track(data = bfb_snv,
+            mapping = map(x = start, y = vaf),
+            windows = bfb_win) %+%
+  seq_point(map(color = mult),
+            aesthetics = aes(size = 0.5, alpha = 0.8)) -> p
 p$plot()
 ```
 
@@ -69,22 +98,28 @@ p$plot()
 Required: `x`, `y`. `aes(type = "step")` switches to a step line
 (useful for signal tracks that represent piecewise-constant values).
 
-```{r line, fig.height = 2.8}
-line_xs <- seq(1.05e6, 2.95e6, length.out = 100)
-line_gr <- GRanges("chr1", IRanges(line_xs, width = 1),
-                   signal = sin((line_xs - 1e6) / 3e5) * 0.4 + 0.5,
-                   step   = round(sin((line_xs - 1e6) / 3e5) * 2) / 4 + 0.5)
+Below, the simulated BFB amplicon on chr2 is shown as the mean SNV VAF in 1 Mb bins (smooth) and as the piecewise-constant copy number of each segment (step). Both rise across the amplified region.
 
+```{r line-data}
+bfb_win_snv <- subsetByOverlaps(bfb_snv, bfb_win)
+bin_start   <- seq(start(bfb_win), end(bfb_win) - 1e6, by = 1e6)
+bin_id      <- factor(findInterval(start(bfb_win_snv), bin_start), seq_along(bin_start))
+bfb_bins    <- GRanges("chr2", IRanges(bin_start + 5e5, width = 1),
+                       mean_vaf = as.vector(tapply(bfb_win_snv$vaf, bin_id, mean)),
+                       n_snv    = as.vector(table(bin_id)))
+```
+
+```{r line, fig.height = 4.5}
 seq_plot() %|%
-  seq_track(track_id = "Smooth",
-            data = line_gr,
-            mapping = map(x = start, y = signal),
-            windows = win) %+%
-  seq_line(aesthetics = aes(color = "#205EA6", linewidth = 1.4)) %|%
-  seq_track(track_id = "Step",
-            data = line_gr,
-            mapping = map(x = start, y = step),
-            windows = win) %+%
+  seq_track(track_id = "Mean VAF",
+            data = bfb_bins,
+            mapping = map(x = start, y = mean_vaf),
+            windows = bfb_win) %+%
+  seq_line(aesthetics = aes(color = "#205EA6", linewidth = 1.4)) %__%
+  seq_track(track_id = "Copy number",
+            data = bfb_seg,
+            mapping = map(x = start, y = cn),
+            windows = bfb_win) %+%
   seq_line(aesthetics = aes(color = "#AF3029",
                             linewidth = 1.4,
                             type = "step")) -> p
@@ -94,22 +129,15 @@ p$plot()
 ## `seq_segment` — one straight line per row
 
 Required: `x`, `x_end`, `y`, `y_end`. Great for quick interval marks —
-a peak span, a read pair, a Manhattan-style baseline.
+a peak span, a read pair, a Manhattan-style baseline. Below, each copy-number segment of a simulated chromothripsis event on chr3 is a horizontal line at its total copy number; the oscillation between CN 3 and CN 1 is the chromothripsis signature.
 
 ```{r segment, fig.height = 2.8}
-seg_gr <- GRanges("chr1",
-  IRanges(start = seq(1.1e6, 2.9e6, by = 2.5e5), width = 1),
-  x_end = seq(1.1e6, 2.9e6, by = 2.5e5) + 1.5e5,
-  y     = runif(8, 0.2, 0.6),
-  y_end = runif(8, 0.4, 0.9),
-  grp   = rep(c("up", "down"), length.out = 8))
-
 seq_plot() %|%
-  seq_track(data = seg_gr,
-            mapping = map(x = start, x_end = x_end,
-                          y = y, y_end = y_end, color = grp),
-            windows = win) %+%
-  seq_segment(aesthetics = aes(linewidth = 2, alpha = 0.85)) -> p
+  seq_track(data = ct_seg,
+            mapping = map(x = start, x_end = end,
+                          y = cn, y_end = cn),
+            windows = ct_win) %+%
+  seq_segment(aesthetics = aes(linewidth = 3, color = "#205EA6")) -> p
 p$plot()
 ```
 
@@ -194,16 +222,13 @@ Required: `x`, `y`. Optional `aes(baseline = ...)` sets the closing
 y-value (default `0`). Coverage curves, pileups, smoothed density
 fills.
 
-```{r area, fig.height = 2.8}
-area_xs <- seq(1.05e6, 2.95e6, length.out = 80)
-area_gr <- GRanges("chr1", IRanges(area_xs, width = 1),
-                   depth = 0.5 + 0.3 * sin((area_xs - 1e6) / 4e5) +
-                           rnorm(80, 0, 0.02))
+Below, the number of SNVs per 1 Mb bin of the simulated BFB amplicon on chr2; mutation counts climb with copy number.
 
+```{r area, fig.height = 2.8}
 seq_plot() %|%
-  seq_track(data = area_gr,
-            mapping = map(x = start, y = depth),
-            windows = win) %+%
+  seq_track(data = bfb_bins,
+            mapping = map(x = start, y = n_snv),
+            windows = bfb_win) %+%
   seq_area(aesthetics = aes(fill = "#4385BE",
                             color = "#205EA6",
                             alpha = 0.65,
@@ -242,17 +267,14 @@ task-specific `map()` vocabulary.
 ## `seq_bar` — per-interval rectangles
 
 One rectangle per observation; `group` stacks bars at identical x
-positions.
+positions. Below, each segment of a simulated chromothripsis and BFB event on chr4 is a bar spanning the segment, with height equal to its copy number.
 
 ```{r bar, fig.height = 2.8}
-bar_gr <- GRanges("chr1",
-  IRanges(start = seq(1.1e6, 2.9e6, by = 2e5), width = 8e4),
-  score = runif(10, 0.2, 1.0))
-
 seq_plot() %|%
-  seq_track(data = bar_gr,
-            mapping = map(x = start, y = score),
-            windows = win) %+%
+  seq_track(data = ctb_seg,
+            mapping = map(x = start, y = cn),
+            windows = ctb_win,
+            scale_y = seq_scale_continuous(limits = c(0, 6))) %+%
   seq_bar(aesthetics = aes(fill = "#4385BE")) -> p
 p$plot()
 ```
@@ -281,20 +303,21 @@ p$plot()
 ## `seq_ribbon` — band between two y series
 
 Required: `y_min`, `y_max`. Confidence bands, min/max pileups, CI
-envelopes — anything that needs a shaded interval per x.
+envelopes — anything that needs a shaded interval per x. Below, the band between the minor and major allele copy number of the simulated chr4 event; the band collapses to zero width in balanced segments and sits on the major allele where the minor allele is lost.
 
 ```{r ribbon, fig.height = 2.8}
-ribbon_xs <- seq(1.05e6, 2.95e6, length.out = 60)
-ribbon_mu <- sin((ribbon_xs - 1e6) / 3e5) * 0.3 + 0.5
-ribbon_gr <- GRanges("chr1", IRanges(ribbon_xs, width = 1),
-                     mean = ribbon_mu,
-                     lo   = ribbon_mu - 0.12,
-                     hi   = ribbon_mu + 0.12)
+# one point at each segment edge so the band is piecewise constant
+ctb_edges <- GRanges("chr4",
+  IRanges(c(start(ctb_seg), end(ctb_seg)), width = 1),
+  cn_minor = rep(ctb_seg$cn_minor, 2),
+  cn_major = rep(ctb_seg$cn_major, 2))
+ctb_edges <- sort(ctb_edges)
 
 seq_plot() %|%
-  seq_track(data = ribbon_gr,
-            mapping = map(x = start, y_min = lo, y_max = hi),
-            windows = win) %+%
+  seq_track(data = ctb_edges,
+            mapping = map(x = start, y_min = cn_minor, y_max = cn_major),
+            windows = ctb_win,
+            scale_y = seq_scale_continuous(limits = c(0, 3))) %+%
   seq_ribbon(aesthetics = aes(fill = "#4385BE", alpha = 0.5)) -> p
 p$plot()
 ```
@@ -303,35 +326,33 @@ p$plot()
 
 Calls `stats::density()` on the resolved `y` and renders the result
 as a filled area. Pre-computed densities should use `seq_area()`
-directly.
+directly. Below, the VAF of SNVs from a simulated whole-genome-doubling tumour on chr1-3. The density runs along the x-axis (VAF, 0 to 1) and `bw` sets the bandwidth; the modes come from SNVs carried by one, two or four copies.
 
 ```{r density, fig.height = 2.8}
-dens_gr <- GRanges("chr1",
-  IRanges(start = seq(1e6, 3e6, length.out = 200), width = 1),
-  score = c(rnorm(120, mean = 0.3, sd = 0.05),
-            rnorm(80,  mean = 0.7, sd = 0.08)))
-
 seq_plot() %|%
-  seq_track(data = dens_gr,
-            mapping = map(x = start, y = score),
-            windows = win) %+%
-  seq_density(aesthetics = aes(fill = "#879A39", alpha = 0.7)) -> p
+  seq_track(data = wgd_snv,
+            mapping = map(x = start, y = vaf),
+            windows = GRanges("chr1", IRanges(1, 248956422)),
+            scale_x = seq_scale_continuous(limits = c(0, 1)),
+            scale_y = seq_scale_continuous(limits = c(0, 1)),
+            aesthetics = aes("axis.y1.visible" = FALSE,
+                                "axis.x1.title.text" = "VAF")) %+%
+  seq_density(aesthetics = aes(fill = "#879A39", alpha = 0.7, bw = 0.02)) -> p
 p$plot()
 ```
 
 ## `seq_tile` — rectangles per interval
 
-Flat mode: one rectangle per observation. Rotated mode (`aes(rotate = TRUE)`) turns each tile into a diamond, the standard Hi-C representation when combined with a genomic y-axis (see below).
+Flat mode: one rectangle per observation, here one tile per segment of the simulated chr4 event, shaded by the B-allele frequency (`baf`; 0.5 is balanced, 1 is LOH). Rotated mode (`aes(rotate = TRUE)`) turns each tile into a diamond, the standard Hi-C representation when combined with a genomic y-axis (see below).
 
-```{r tile, fig.height = 2.8}
-tile_gr <- GRanges("chr1",
-  IRanges(start = seq(1.1e6, 2.9e6, by = 1e5), width = 8e4),
-  fill_col = sample(flexoki_palette(5), 19, replace = TRUE))
+```{r tile, fig.height = 1.6}
+baf_ramp <- grDevices::colorRampPalette(c("#DAD8CE", "#205EA6"))(100)
+ctb_seg$baf_col <- baf_ramp[round((ctb_seg$baf - 0.5) / 0.5 * 99) + 1]
 
 seq_plot() %|%
-  seq_track(data = tile_gr,
-            mapping = map(x = start, fill = fill_col),
-            windows = win) %+%
+  seq_track(data = ctb_seg,
+            mapping = map(x = start, fill = baf_col),
+            windows = ctb_win) %+%
   seq_tile() -> p
 p$plot()
 ```
@@ -377,17 +398,14 @@ p$plot()
 
 Vertical stem from `baseline` (default `0`) up to `y`, with a point at
 `y`. Standard for sparse discrete events (mutation impact, peak
-summits).
+summits). Below, the junctions of the simulated chr4 event, placed at their first breakpoint with height equal to the junction copy number (`jcn`).
 
 ```{r lollipop, fig.height = 2.8}
-lp_gr <- GRanges("chr1",
-  IRanges(start = sample(seq(1.05e6, 2.95e6, by = 1e4), 15), width = 1),
-  impact = runif(15, 0.2, 1.0))
-
 seq_plot() %|%
-  seq_track(data = lp_gr,
-            mapping = map(x = start, y = impact),
-            windows = win) %+%
+  seq_track(data = ctb_sv,
+            mapping = map(x = start, y = jcn),
+            windows = ctb_win,
+            scale_y = seq_scale_continuous(limits = c(0, 5.5))) %+%
   seq_lollipop(aesthetics = aes(color = "#AF3029", linewidth = 1.2)) -> p
 p$plot()
 ```

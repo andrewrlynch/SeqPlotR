@@ -61,14 +61,6 @@ set.seed(42)
 gr_cnt <- GRanges("chr1", IRanges(sort(sample(1:999000, 120)), width = 1),
                   score = round(runif(120, 0, 100), 1))
 
-# features with a continuous score and a discrete type
-n <- 400
-gr <- GRanges("chr1",
-              IRanges(sort(sample(1:999000, n)),
-                      width = sample(500:3000, n, replace = TRUE)),
-              score = round(runif(n, 0, 1), 3),
-              type  = sample(c("H3K27ac", "H3K4me3", "H3K27me3"), n, replace = TRUE))
-
 # contact-map-like tiles
 n_bins <- 60
 starts_hic <- seq(1, 1e6, length.out = n_bins + 1)[-(n_bins + 1)]
@@ -78,6 +70,16 @@ gr_tiles <- GRanges("chr1", IRanges(starts_hic[pairs$i], width = 1e6 / n_bins),
                     y = pairs$j,
                     fill = pmax(0, pmin(1, round(exp(-(pairs$j - pairs$i) * 0.08) +
                                                    rnorm(nrow(pairs), 0, 0.05), 3))))
+
+# simulated chromothripsis on chr3: somatic SNVs and copy-number segments
+sim <- function(f) utils::read.delim(system.file("extdata", "sim", "ct", f, package = "SeqPlotR"))
+snv <- sim("snvs.tsv")
+snv <- GRanges(snv$chrom, IRanges(snv$pos, width = 1), vaf = snv$vaf, depth = snv$depth,
+               sbs6 = snv$sbs6, clonality = ifelse(snv$clonal, "clonal", "subclonal"))
+seg <- sim("segments.tsv")
+seg <- GRanges(seg$chrom, IRanges(seg$start, seg$end), cn = seg$cn,
+               state = ifelse(seg$cn > 2, "gain", ifelse(seg$cn < 2, "loss", "neutral")))
+win_ct <- GRanges("chr3", IRanges(9.5e7, 1.95e8))
 
 # right margin wide enough for auto-generated legends
 right_margin <- aes(margins = list(top = 0, right = 0.25, bottom = 0, left = 0))
@@ -340,65 +342,83 @@ p11$plot()
 
 Mapping a column to `color`, `fill` or `shape` generates a legend with no `seq_legend()` call. Discrete columns give a keyed legend (flexoki palette; shapes cycle circle, square, triangle, diamond) and numeric columns give a viridis color bar. Auto-legends go in the right track margin, so reserve space with the plot-level `margins` aesthetic. An explicit `legend` always overrides auto-generation.
 
-```{r auto-discrete, fig.cap = "Three-level discrete color legend in the right track margin."}
+The examples below use a simulated chromothripsis sample. `snv` holds its somatic SNVs on chr3 (variant allele fraction, read depth, the six-class mutation type `sbs6`, and whether the SNV is clonal), and `seg` holds its copy-number segments, where the shattered region between 100 and 190 Mb oscillates between copy number 3 and 1.
+
+Mapping `color` to the mutation type gives a six-level discrete legend:
+
+```{r auto-discrete, fig.cap = "Six-level discrete color legend for SNV mutation type in the right track margin."}
 p1 <- seq_plot(aesthetics = right_margin) %+%
-  seq_track(data = gr, mapping = map(x = start, y = score), windows = win) %+%
+  seq_track(data = snv, mapping = map(x = start, y = vaf), windows = win_ct) %+%
   seq_point(
     aesthetics = aes(size = 0.6, alpha = 0.7),
-    mapping    = map(color = type)
+    mapping    = map(color = sbs6)
   )
 p1$plot()
 ```
 
-```{r auto-shape, fig.cap = "Shape legend auto-generated from map(shape = type) in the right track margin."}
+Mapping `shape` to clonality marks clonal and subclonal SNVs with different glyphs:
+
+```{r auto-shape, fig.cap = "Shape legend auto-generated from map(shape = clonality) in the right track margin."}
 p2 <- seq_plot(aesthetics = right_margin) %+%
-  seq_track(data = gr, mapping = map(x = start, y = score), windows = win) %+%
+  seq_track(data = snv, mapping = map(x = start, y = vaf), windows = win_ct) %+%
   seq_point(
     aesthetics = aes(size = 0.8, alpha = 0.7),
-    mapping    = map(shape = type)
+    mapping    = map(shape = clonality)
   )
 p2$plot()
 ```
 
-```{r auto-continuous, fig.cap = "Viridis color bar with auto tick axis in the right track margin."}
+A numeric column gives a color bar. Here read depth is on the y axis, which drops where the copy number falls to 1, and the color shows the variant allele fraction:
+
+```{r auto-continuous, fig.cap = "Viridis color bar with auto tick axis for SNV variant allele fraction."}
 p3 <- seq_plot(aesthetics = right_margin) %+%
-  seq_track(data = gr, mapping = map(x = start, y = score), windows = win) %+%
+  seq_track(data = snv, mapping = map(x = start, y = depth), windows = win_ct) %+%
   seq_point(
     aesthetics = aes(size = 0.7, alpha = 0.8),
-    mapping    = map(color = score)
+    mapping    = map(color = vaf)
   )
 p3$plot()
 ```
 
-The same applies to other elements: `seq_bar` and `seq_line` with a discrete column, `seq_area` with a numeric one, and `seq_tile` heatmaps.
+The same applies to other elements, including `seq_bar`, `seq_segment` and `seq_tile` heatmaps. Copy-number segments drawn as bars take their fill from the gain, loss or neutral state:
 
-```{r auto-bar-discrete, fig.cap = "Bar chart with discrete fill auto-legend from map(fill = type)."}
+```{r auto-bar-discrete, fig.cap = "Copy-number segment bars with a discrete fill legend from map(fill = state)."}
 p4 <- seq_plot(aesthetics = right_margin) %+%
-  seq_track(data = gr, mapping = map(x = start, y = score), windows = win) %+%
+  seq_track(data = seg, mapping = map(x = start, y = cn), windows = win_ct,
+            scale_y = seq_scale_continuous(limits = c(0, 3.2))) %+%
   seq_bar(
     aesthetics = aes(alpha = 0.85),
-    mapping    = map(x = start, y = score, fill = type)
+    mapping    = map(x = start, y = cn, fill = state)
   )
 p4$plot()
 ```
 
-```{r auto-line, fig.cap = "seq_line with discrete color auto-legend."}
+`seq_segment` draws one horizontal line per copy-number segment, colored by state:
+
+```{r auto-segment, fig.cap = "seq_segment with a discrete color legend from map(color = state)."}
 p5 <- seq_plot(aesthetics = right_margin) %+%
-  seq_track(data = gr, mapping = map(x = start, y = score), windows = win) %+%
-  seq_line(
-    mapping = map(x = start, y = score, color = type)
+  seq_track(data = seg, mapping = map(x = start, y = cn), windows = win_ct,
+            scale_y = seq_scale_continuous(limits = c(0, 3.5))) %+%
+  seq_segment(
+    aesthetics = aes(linewidth = 3),
+    mapping    = map(x = start, x_end = end, y = cn, y_end = cn, color = state)
   )
 p5$plot()
 ```
 
-```{r auto-area, fig.cap = "seq_area with continuous fill gradient auto-legend."}
+A numeric fill gives a gradient. Here the bar fill follows the integer copy number:
+
+```{r auto-gradient-bar, fig.cap = "Copy-number segment bars with a continuous fill gradient from map(fill = cn)."}
 p6 <- seq_plot(aesthetics = right_margin) %+%
-  seq_track(data = gr, mapping = map(x = start, y = score), windows = win) %+%
-  seq_area(
-    mapping = map(x = start, y = score, fill = score)
+  seq_track(data = seg, mapping = map(x = start, y = cn), windows = win_ct,
+            scale_y = seq_scale_continuous(limits = c(0, 3.2))) %+%
+  seq_bar(
+    mapping = map(x = start, y = cn, fill = cn)
   )
 p6$plot()
 ```
+
+The tile heatmap keeps the contact-map tiles, since the simulated data has no contact matrix:
 
 ```{r auto-heatmap, fig.height = 3.6, fig.cap = "Contact-map tiles with auto gradient legend."}
 p7 <- seq_plot(

@@ -53,6 +53,24 @@ library(GenomicRanges)
 win <- GRanges("chr1", IRanges(1e6, 3e6))
 ```
 
+Most examples use simulated structural variants, copy-number segments
+and SNVs shipped with the package. A small helper reads one table of a
+scenario, and the junctions of two scenarios are loaded once here: a
+simulated chromothripsis on chr3 (`ct`) and a simulated chromothripsis
+followed by breakage-fusion-bridge cycles on chr4 (`ct_bfb`).
+
+```{r sim-data}
+sim <- function(sc, f) {
+  utils::read.delim(system.file("extdata", "sim", sc, paste0(f, ".tsv"),
+                                package = "SeqPlotR"))
+}
+
+ct_sv  <- sim("ct", "svs")
+bfb_sv <- sim("ct_bfb", "svs")
+ct_win  <- GRanges("chr3", IRanges(9.5e7, 1.95e8))
+bfb_win <- GRanges("chr4", IRanges(5.8e7, 1.24e8))
+```
+
 ## Anatomy of a `seq_link`
 
 Every link has two anchors. SeqPlotR encodes them in a single `data`
@@ -96,29 +114,26 @@ strand0 = strand, ...)`.
 ## `seq_arc` — within-track arch, no stems
 
 `seq_arc` draws a single Bezier arch between two loci. The simplest
-form encodes the loci as `start` / `end` of one GRanges row.
+form encodes the loci as `start` / `end` of one GRanges row. Here each
+junction of a simulated chromothripsis-plus-BFB event on chr4 becomes
+one range, and its junction copy number sets the arch height.
 
 ```{r arc-simple, fig.height = 2.6}
-arc_gr <- GRanges(
-  "chr1",
-  IRanges(start = c(1.2e6, 1.6e6, 2.1e6),
-          end   = c(1.5e6, 2.0e6, 2.7e6)),
-  score = c(0.3, 0.7, 0.5)
-)
+arc_gr <- GRanges(bfb_sv$chrom1, IRanges(bfb_sv$pos1, bfb_sv$pos2),
+                  jcn = bfb_sv$jcn)
 
 seq_plot() %|%
   seq_track(track_id = "A",
             data = arc_gr,
-            mapping = map(x = start, y = score),
-            windows = win) %+%
-  seq_arc(map(x0 = start, x1 = end,
-              y0 = score, height = score),
+            mapping = map(x = start, y = jcn),
+            windows = bfb_win) %+%
+  seq_arc(map(x0 = start, x1 = end, height = jcn),
           aesthetics = aes(color = "#4385BE", linewidth = 1.2)) -> p
 p$plot()
 ```
 
-`map(height = score)` makes each arch's peak as tall as its score; the
-peak heights are interpreted in the track's `yscale`.
+`map(height = jcn)` makes each arch's peak as tall as the junction copy
+number; the peak heights are interpreted in the track's `yscale`.
 
 ### Curve and orientation
 
@@ -134,9 +149,9 @@ peak heights are interpreted in the track's `yscale`.
 seq_plot() %|%
   seq_track(track_id = "A",
             data = arc_gr,
-            mapping = map(x = start, y = score),
-            windows = win) %+%
-  seq_arc(map(x0 = start, x1 = end, height = score),
+            mapping = map(x = start, y = jcn),
+            windows = bfb_win) %+%
+  seq_arc(map(x0 = start, x1 = end, height = jcn),
           aesthetics = aes(color = "#AF3029",
                            linewidth = 1.5,
                            curve = "equal")) -> p
@@ -152,22 +167,22 @@ end with a small angled hook and a label naming the partner chromosome.
 
 ### A BEDPE-style data.frame
 
+The junction table of a simulated chromothripsis with BFB cycles on
+chr4 is already BEDPE-like. Mapping the junction copy number to the
+arch height makes the high-copy fold-back inversion stand out. Heights
+are in track-relative units, so jcn is rescaled to 0.2-1 first.
+The 2 kb fold-back inversions are too narrow to show an arch and
+appear as single stems.
+
 ```{r arch-bedpe, fig.height = 3}
-sv_df <- data.frame(
-  chr1    = "chr1",
-  start1  = c(1.15e6, 1.40e6, 1.85e6, 2.20e6),
-  chr2    = "chr1",
-  start2  = c(1.55e6, 2.05e6, 2.45e6, 2.75e6),
-  height  = c(0.8,    0.5,    0.7,    0.6),
-  stringsAsFactors = FALSE
-)
+bfb_sv$h <- 0.2 + 0.8 * bfb_sv$jcn / max(bfb_sv$jcn)
 
 seq_plot() %|%
-  seq_track(track_id = "A", windows = win) %+%
-  seq_arch(data = sv_df,
-           mapping = map(x0 = start1, x1 = start2,
-                         chrom0 = chr1, chrom1 = chr2,
-                         height = height),
+  seq_track(track_id = "A", windows = bfb_win) %+%
+  seq_arch(data = bfb_sv,
+           mapping = map(x0 = pos1, x1 = pos2,
+                         chrom0 = chrom1, chrom1 = chrom2,
+                         height = h),
            aesthetics = aes(color = "#205EA6", linewidth = 1.2)) -> p
 p$plot()
 ```
@@ -219,57 +234,60 @@ pair on its two anchors:
 Both `strand0` and `strand1` must be supplied via `map()` —
 `seq_recon` errors at `prep()` time if either is missing.
 
-### A mixed SV table
+### Junctions of a chromothripsis
 
-A handful of synthetic structural variants spanning all five classes:
+A simulated chromothripsis on chr3 has four inversions, three
+duplications and three deletions. The simulated strands already follow
+the `seq_recon` convention, so the table maps directly:
 
 ```{r recon-data}
-sv_tbl <- data.frame(
-  chr1    = "chr1",
-  start1  = c(1.15e6, 1.30e6, 1.55e6, 1.80e6, 2.10e6,
-              2.35e6, 2.55e6, 2.75e6),
-  chr2    = c("chr1","chr1","chr1","chr1","chr1",
-              "chr1","chr1","chr2"),
-  start2  = c(1.50e6, 1.85e6, 2.05e6, 2.30e6, 2.60e6,
-              2.85e6, 4.20e6, 5.00e5),
-  strand1 = c("+","-","-","+","+",
-              "-","+","+"),
-  strand2 = c("+","-","+","-","+",
-              "-","+","+"),
-  stringsAsFactors = FALSE
-)
-sv_tbl
+ct_sv[, c("chrom1", "pos1", "strand1", "chrom2", "pos2", "strand2", "sv_type")]
 ```
 
 Plot with the canonical recon mapping:
 
 ```{r recon-plot, fig.height = 3.5}
+recon_map <- map(x0 = pos1, x1 = pos2,
+                 chrom0 = chrom1, chrom1 = chrom2,
+                 strand0 = strand1, strand1 = strand2)
+
 seq_plot() %|%
-  seq_track(track_id = "SV", windows = win) %+%
-  seq_recon(data = sv_tbl,
-            mapping = map(x0 = start1, x1 = start2,
-                          chrom0 = chr1, chrom1 = chr2,
-                          strand0 = strand1, strand1 = strand2)) -> p
+  seq_track(track_id = "SV", windows = ct_win) %+%
+  seq_recon(data = ct_sv, mapping = recon_map) -> p
 p$plot()
 ```
 
-The three horizontal guide lines mark the inversion / Dup-Del /
-translocation tiers; HH/TT, DEL/DUP, and TRA labels sit on the
-left margin.
+The horizontal guide lines mark the inversion and Dup/Del tiers, with
+HH/TT and DEL/DUP labels on the left margin. This scenario has no
+translocations, so the TRA tier stays empty and is not drawn.
+
+### Adding a translocation
+
+To show the translocation tier, one hand-made row joins a chr3
+breakpoint to chr5. It is not part of the simulated data.
+
+```{r recon-tra, fig.height = 3.5}
+tra_row <- data.frame(chrom1 = "chr3", pos1 = 1.45e8, strand1 = "+",
+                      chrom2 = "chr5", pos2 = 3.0e7, strand2 = "-")
+sv_tra <- rbind(ct_sv[, names(tra_row)], tra_row)
+
+seq_plot() %|%
+  seq_track(track_id = "SV", windows = ct_win) %+%
+  seq_recon(data = sv_tra, mapping = recon_map) -> p
+p$plot()
+```
 
 ### Recoloring classes
 
 Override any default colour via `aes(h2hColor = ..., t2tColor = ...,
 dupColor = ..., delColor = ..., transColor = ...)`. A high-contrast
-palette:
+palette on the chromothripsis junctions plus the hand-made
+translocation:
 
 ```{r recon-recolor, fig.height = 3.5}
 seq_plot() %|%
-  seq_track(track_id = "SV", windows = win) %+%
-  seq_recon(data = sv_tbl,
-            mapping = map(x0 = start1, x1 = start2,
-                          chrom0 = chr1, chrom1 = chr2,
-                          strand0 = strand1, strand1 = strand2),
+  seq_track(track_id = "SV", windows = ct_win) %+%
+  seq_recon(data = sv_tra, mapping = recon_map,
             aesthetics = aes(h2hColor   = "#AF3029",
                              t2tColor   = "#205EA6",
                              dupColor   = "#66800B",
@@ -281,16 +299,13 @@ p$plot()
 ### Subsetting the rendered tiers
 
 `drawClasses` controls which tiers are drawn (and which guides /
-labels appear). Drop the translocation row to focus on intra-chromosome
+labels appear). Drop the translocation tier to focus on the intra-chromosome
 calls:
 
 ```{r recon-subset, fig.height = 3}
 seq_plot() %|%
-  seq_track(track_id = "SV", windows = win) %+%
-  seq_recon(data = sv_tbl,
-            mapping = map(x0 = start1, x1 = start2,
-                          chrom0 = chr1, chrom1 = chr2,
-                          strand0 = strand1, strand1 = strand2),
+  seq_track(track_id = "SV", windows = ct_win) %+%
+  seq_recon(data = sv_tra, mapping = recon_map,
             drawClasses = c("Inversion", "Dup/Del")) -> p
 p$plot()
 ```
@@ -321,50 +336,54 @@ inference:
 
 Force a specific shape with `aes(type = "c")` or `aes(type = "s")`.
 
-### SV breakpoints across copy-number and coverage tracks
+### SV breakpoints across copy-number and SNV tracks
 
-A simulated copy-number scatter over a coverage ribbon, with three SV
-breakpoints connecting loci across the two tracks. Per-link `y0` / `y1`
-values anchor each string to a specific data-scale y in its track.
+A simulated chromothripsis with BFB cycles on chr4, shown as a
+copy-number segment track above an SNV allele-fraction track. Each SV
+joins its first breakpoint on the copy-number step to its second
+breakpoint in the SNV track. Per-link `y0` / `y1` values anchor each
+string to a data-scale y in its track: `y0` sits on the bottom of the
+copy-number axis and `y1` on the top of the VAF axis, so the curves run
+through the gap between the tracks.
+
+```{r string-data}
+bfb_seg <- sim("ct_bfb", "segments")
+bfb_seg <- bfb_seg[bfb_seg$end > 5.8e7 & bfb_seg$start < 1.24e8, ]
+seg_gr  <- GRanges(bfb_seg$chrom, IRanges(bfb_seg$start, bfb_seg$end),
+                   cn = bfb_seg$cn)
+
+snv <- sim("ct_bfb", "snvs")
+snv <- snv[snv$pos > 5.8e7 & snv$pos < 1.24e8, ]
+snv_gr <- GRanges(snv$chrom, IRanges(snv$pos, width = 1), vaf = snv$vaf)
+
+bfb_sv$cn0  <- 1
+bfb_sv$vaf1 <- 0.8
+```
 
 ```{r string-cross-track, fig.height = 4.5}
-xs     <- seq(1.05e6, 2.95e6, length.out = 120)
-cn_gr  <- GRanges("chr1", IRanges(xs, width = 1),
-                  logR = sin((xs - 1e6) / 5e5) + rnorm(length(xs), 0, 0.08))
-cov_gr <- GRanges("chr1", IRanges(xs, width = 1),
-                  score = 0.5 + 0.3 * cos((xs - 1e6) / 4e5))
-
-sv_df <- data.frame(
-  c0 = "chr1", p0 = c(1.30e6, 1.75e6, 2.25e6),
-  c1 = "chr1", p1 = c(1.60e6, 2.10e6, 2.65e6),
-  s0 = c("+", "-", "+"),
-  s1 = c("-", "+", "-"),
-  y0 = c( 0.8, -0.6,  0.4),
-  y1 = c( 0.6,  0.7,  0.5),
-  stringsAsFactors = FALSE
-)
-
 seq_plot() %|%
-  seq_track(track_id = "CN",  windows = win, track_height = 1.2) %+%
-    seq_point(data = cn_gr, mapping = map(x = start, y = logR),
-              aesthetics = aes(color = "#205EA6", size = 0.35)) %__%
-  seq_track(track_id = "COV", windows = win, track_height = 1.2) %+%
-    seq_area(data = cov_gr, mapping = map(x = start, y = score),
-             aesthetics = aes(fill = "#66800B", alpha = 0.5)) %+%
-  seq_string(data = sv_df,
-             map(x0 = p0, x1 = p1, chrom0 = c0, chrom1 = c1,
-                 strand0 = s0, strand1 = s1,
-                 y0 = y0, y1 = y1),
-             t0 = "CN", t1 = "COV",
-             aesthetics = aes(color = "#AF3029", linewidth = 1.3,
+  seq_track(track_id = "CN", windows = bfb_win, track_height = 1.2) %+%
+    seq_segment(data = seg_gr,
+                mapping = map(x = start, x_end = end, y = cn, y_end = cn),
+                aesthetics = aes(color = "#205EA6", linewidth = 2)) %__%
+  seq_track(track_id = "SNV", windows = bfb_win, track_height = 1.2) %+%
+    seq_point(data = snv_gr, mapping = map(x = start, y = vaf),
+              aesthetics = aes(color = "#66800B", size = 0.25,
+                               alpha = 0.5)) %+%
+  seq_string(data = bfb_sv,
+             map(x0 = pos1, x1 = pos2, chrom0 = chrom1, chrom1 = chrom2,
+                 strand0 = strand1, strand1 = strand2,
+                 y0 = cn0, y1 = vaf1),
+             t0 = "CN", t1 = "SNV",
+             aesthetics = aes(color = "#AF3029", linewidth = 1.1,
                               alpha = 0.75)) -> p
 p$plot()
 ```
 
 Each string lands at `(x0, y0)` in the CN track and `(x1, y1)` in the
-COV track. Strands drive the curve shape: the first and third links
-(mixed strands) bend as S-curves, the middle link (matching strands
-after swap) bends as a C-curve.
+SNV track. Strands drive the curve shape: deletions and duplications
+(opposing strands) bend as S-curves, inversions (matching strands)
+bend as C-curves.
 
 ### Forcing a shape
 
@@ -373,17 +392,19 @@ string as a C-curve regardless of strand:
 
 ```{r string-force-c, fig.height = 4.5}
 seq_plot() %|%
-  seq_track(track_id = "CN",  windows = win, track_height = 1.2) %+%
-    seq_point(data = cn_gr, mapping = map(x = start, y = logR),
-              aesthetics = aes(color = "#205EA6", size = 0.35)) %__%
-  seq_track(track_id = "COV", windows = win, track_height = 1.2) %+%
-    seq_area(data = cov_gr, mapping = map(x = start, y = score),
-             aesthetics = aes(fill = "#66800B", alpha = 0.5)) %+%
-  seq_string(data = sv_df,
-             map(x0 = p0, x1 = p1, chrom0 = c0, chrom1 = c1,
-                 y0 = y0, y1 = y1),
-             t0 = "CN", t1 = "COV",
-             aesthetics = aes(color = "#BC5215", linewidth = 1.3,
+  seq_track(track_id = "CN", windows = bfb_win, track_height = 1.2) %+%
+    seq_segment(data = seg_gr,
+                mapping = map(x = start, x_end = end, y = cn, y_end = cn),
+                aesthetics = aes(color = "#205EA6", linewidth = 2)) %__%
+  seq_track(track_id = "SNV", windows = bfb_win, track_height = 1.2) %+%
+    seq_point(data = snv_gr, mapping = map(x = start, y = vaf),
+              aesthetics = aes(color = "#66800B", size = 0.25,
+                               alpha = 0.5)) %+%
+  seq_string(data = bfb_sv,
+             map(x0 = pos1, x1 = pos2, chrom0 = chrom1, chrom1 = chrom2,
+                 y0 = cn0, y1 = vaf1),
+             t0 = "CN", t1 = "SNV",
+             aesthetics = aes(color = "#BC5215", linewidth = 1.1,
                               alpha = 0.75, type = "c")) -> p
 p$plot()
 ```
