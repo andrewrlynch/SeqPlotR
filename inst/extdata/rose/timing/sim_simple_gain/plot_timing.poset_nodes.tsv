@@ -1,0 +1,2 @@
+event_id	type	shape_key	x	y	bar_lo	bar_hi	glyph	layer	group_id	faded	alpha	label
+gain_2_1	GAIN	GAIN	1	0.39325846407679088	0.34455911324037453	0.44063436567524567	point	0	1	FALSE	1	gain_2_1

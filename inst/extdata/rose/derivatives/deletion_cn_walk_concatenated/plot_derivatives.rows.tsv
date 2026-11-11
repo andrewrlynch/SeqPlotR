@@ -1,0 +1,6 @@
+row_id	kind	y_order	label	sublabel	dashed	candidate_id	rank	derivative_id
+1	reference	0	chr1	NA	FALSE	NA	NA	NA
+2	derivative	1	der(1)	NA	FALSE	1	1	1
+3	derivative	2	NA	NA	FALSE	1	1	1
+4	derivative	3	ref allele	NA	FALSE	1	1	2
+5	deleted	4	Deleted copies	NA	TRUE	NA	NA	NA

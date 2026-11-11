@@ -1,0 +1,5 @@
+from_event	to_event	kind	arrow	style_key	label	conflict
+gain_5_1	wgd_1	hasse	TRUE	snv	>0.99	FALSE
+wgd_1	loss_1_1	hasse	TRUE	mixed	>0.99	FALSE
+loss_3_1	wgd_1	hasse	TRUE	mixed	>0.99	FALSE
+loss_3_1	gain_5_1	unordered	FALSE	structure	NA	FALSE

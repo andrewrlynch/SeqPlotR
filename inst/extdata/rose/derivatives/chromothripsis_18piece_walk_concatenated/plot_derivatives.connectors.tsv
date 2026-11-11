@@ -1,0 +1,16 @@
+connector_id	row_from	block_from	side_from	row_to	block_to	side_to	kind	junction_id	same_row_up
+1	2	19	right	3	20	left	junction	sv2	FALSE
+2	3	20	right	4	21	right	junction	sv3	FALSE
+3	4	21	left	5	22	left	junction	sv4	FALSE
+4	5	22	right	6	23	right	junction	sv5	FALSE
+5	6	23	left	7	24	left	junction	sv6	FALSE
+6	7	24	right	8	25	right	junction	sv7	FALSE
+7	8	25	left	9	26	left	junction	sv8	FALSE
+8	9	26	right	10	27	right	junction	sv9	FALSE
+9	10	27	left	11	28	left	junction	sv10	FALSE
+10	11	28	right	12	29	left	junction	sv11	FALSE
+11	12	29	right	13	30	right	junction	sv12	FALSE
+12	13	30	left	14	31	left	junction	sv13	FALSE
+13	14	31	right	15	32	left	junction	sv14	FALSE
+14	15	32	right	16	33	right	junction	sv15	FALSE
+15	16	33	left	17	34	left	junction	sv16	FALSE

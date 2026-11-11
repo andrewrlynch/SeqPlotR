@@ -1,0 +1,7 @@
+window_id	row_id	chrom	start	end
+1	1	chr2	0	242193529
+2	2	loose #1	0	193000000
+3	3	loose #2	0	13000000
+4	4	loose #3	0	89529611.74000001
+5	5	ref allele	0	242193529
+6	6	deleted	0	42193529

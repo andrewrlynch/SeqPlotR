@@ -1,0 +1,8 @@
+row_id	kind	y_order	label	sublabel	dashed	candidate_id	rank	derivative_id
+1	reference	0	reference	NA	FALSE	NA	NA	NA
+2	derivative	1	dic(2;8)	dicentric	FALSE	1	1	1
+3	deleted	2	Deleted copies	NA	TRUE	NA	NA	NA
+4	candidate_strip	3	Or (rank 2)	NA	FALSE	2	2	1
+5	candidate_strip	4	Or (rank 2)	dicentric	FALSE	2	2	2
+6	candidate_strip	5	Or (rank 3)	NA	FALSE	3	3	1
+7	candidate_strip	6	Or (rank 3)	dicentric	FALSE	3	3	2

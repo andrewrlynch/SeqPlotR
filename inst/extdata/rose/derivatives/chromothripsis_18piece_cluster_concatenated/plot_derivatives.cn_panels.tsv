@@ -1,0 +1,3 @@
+panel_id	chrom	win_start	win_end	y_order	label
+1	chr2	0	269456752.48	0	chr2: 0.00-269.46 Mb
+2	chr8	0	120960001	1	chr8: 0.00-120.96 Mb

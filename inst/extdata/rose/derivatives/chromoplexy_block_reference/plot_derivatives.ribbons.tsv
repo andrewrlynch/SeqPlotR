@@ -1,0 +1,7 @@
+fragment_id	row_id	block_id	ref_chrom	ref_start	ref_end	twisted
+1	2	9	chr1	0	150000000	FALSE
+3	2	10	chr5	0	38000000	TRUE
+6	3	11	chr10	0	60000000	FALSE
+2	3	12	chr1	150000000	248956422	FALSE
+5	4	13	chr5	41999999	181538259	TRUE
+8	4	14	chr10	61999999	133797422	FALSE

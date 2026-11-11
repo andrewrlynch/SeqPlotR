@@ -1,0 +1,17 @@
+connector_id	row_from	block_from	side_from	row_to	block_to	side_to	kind	junction_id	same_row_up
+1	2	22	right	2	23	left	junction	sim_ct_bfb_1	TRUE
+2	2	23	right	2	24	right	junction	sim_ct_bfb_8	TRUE
+3	2	24	left	2	25	right	junction	sim_ct_bfb_3	TRUE
+4	2	25	left	2	26	right	junction	sim_ct_bfb_2	TRUE
+5	2	26	left	2	27	left	junction	sim_ct_bfb_4	TRUE
+6	2	31	right	2	32	right	junction	sim_ct_bfb_7	TRUE
+7	2	32	left	2	33	left	junction	sim_ct_bfb_10	TRUE
+8	2	34	right	2	35	right	junction	sim_ct_bfb_7	TRUE
+9	2	35	left	2	36	left	junction	sim_ct_bfb_6	TRUE
+10	2	37	right	2	38	right	junction	sim_ct_bfb_7	TRUE
+11	2	39	left	2	40	left	junction	sim_ct_bfb_9	TRUE
+12	2	41	right	2	42	right	junction	sim_ct_bfb_11	TRUE
+13	2	42	left	2	43	left	junction	sim_ct_bfb_9	TRUE
+14	2	44	right	2	45	right	junction	sim_ct_bfb_7	TRUE
+15	2	47	left	2	48	left	junction	sim_ct_bfb_5	TRUE
+16	2	51	right	2	52	right	junction	sim_ct_bfb_7	TRUE

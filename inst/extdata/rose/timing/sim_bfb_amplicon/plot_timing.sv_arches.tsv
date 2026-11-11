@@ -1,0 +1,6 @@
+arch_id	junction_id	event_id	chr1	pos1	chr2	pos2	sv_type	multiplicity	timing_basis	bound_type	glyph	y	bar_lo	bar_hi	layer	faded	alpha	ecdna_caution	colour_key
+arch_1	sim_bfb_amplicon_1	sv_sim_bfb_amplicon_1	chr2	179998001	chr2	180000001	t2tINV	2	snv	NA	point	0.50413992248954953	0.39709947392816708	0.61564846603892742	2	FALSE	1	FALSE	t2tINV
+arch_2	sim_bfb_amplicon_2	sv_sim_bfb_amplicon_2	chr2	184998001	chr2	185000001	t2tINV	1	snv	NA	point	0.77748402441703635	0.61744069812029223	0.93109199172767709	5	FALSE	1	FALSE	t2tINV
+arch_3	sim_bfb_amplicon_3	sv_sim_bfb_amplicon_3	chr2	191998000	chr2	192000000	h2hINV	1	snv	NA	point	0.58584582807800567	0.46347346266724632	0.72440658284556314	3	FALSE	1	FALSE	h2hINV
+arch_4	sim_bfb_amplicon_4	sv_sim_bfb_amplicon_4	chr2	192998000	chr2	193000000	h2hINV	2	snv	NA	point	0.72294201984936612	0.5615394243912516	0.85644927677172744	4	FALSE	1	FALSE	h2hINV
+arch_5	sim_bfb_amplicon_5	sv_sim_bfb_amplicon_5	chr2	199998000	chr2	200000000	h2hINV	1	snv	NA	point	0.37721365797447975	0.26538422883495416	0.49725825833327125	1	FALSE	1	FALSE	h2hINV

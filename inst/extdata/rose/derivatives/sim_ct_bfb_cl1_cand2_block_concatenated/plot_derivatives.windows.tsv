@@ -1,0 +1,5 @@
+window_id	row_id	chrom	start	end
+1	1	chr4	0	190214555
+2	2	der(4)	0	157932491.56
+3	3	ref allele	0	190214555
+4	4	deleted	0	104496705.96000001

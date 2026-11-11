@@ -1,0 +1,6 @@
+group_id	layer	x	y	members	label
+1	2	2	0.50413992248954953	sv_sim_bfb_amplicon_1	sv_sim_bfb_amplicon_1
+2	5	5	0.77748402441703635	sv_sim_bfb_amplicon_2	sv_sim_bfb_amplicon_2
+3	3	3	0.58584582807800567	sv_sim_bfb_amplicon_3	sv_sim_bfb_amplicon_3
+4	4	4	0.72294201984936612	sv_sim_bfb_amplicon_4	sv_sim_bfb_amplicon_4
+5	1	1	0.37721365797447975	sv_sim_bfb_amplicon_5	sv_sim_bfb_amplicon_5

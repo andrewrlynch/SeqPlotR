@@ -1,0 +1,6 @@
+connector_id	row_from	block_from	side_from	row_to	block_to	side_to	kind	junction_id	same_row_up
+1	4	33	right	4	34	left	junction	sim_bfb_amplicon_5	TRUE
+2	4	41	right	4	42	left	junction	sim_bfb_amplicon_1	TRUE
+3	4	45	right	4	46	left	junction	sim_bfb_amplicon_3	TRUE
+4	4	47	right	4	48	left	junction	sim_bfb_amplicon_2	TRUE
+5	4	50	right	4	51	left	junction	sim_bfb_amplicon_4	TRUE

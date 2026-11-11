@@ -1,0 +1,7 @@
+window_id	row_id	chrom	start	end
+1	1	chr3	0	198295559
+2	2	der(3) #1	0	193778401.372
+3	3	der(3) #2	0	204453507.07999998
+4	4	loose	0	8295559
+5	5	ref allele	0	198295559
+6	6	deleted	0	24776159.124

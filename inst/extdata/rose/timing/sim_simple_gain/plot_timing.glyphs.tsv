@@ -1,0 +1,2 @@
+glyph_id	kind	source_id	chr	start	end	x	glyph	y	bar_lo	bar_hi	faded	alpha	label	ecdna_caution	colour_key
+event_1	event	gain_2_1	chr8	47200001	145138636	96169318	point	0.39325846407679088	0.34455911324037453	0.44063436567524567	FALSE	1	gain_2_1	FALSE	snv

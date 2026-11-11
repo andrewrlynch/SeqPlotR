@@ -1,0 +1,2 @@
+candidate_id	rank	n_candidates	cluster	approximate	approximate_reason	cn_residual	truncated	text
+2	2	10	1	FALSE	NA	0	FALSE	Model candidate derivatives (not truth); cluster 1, candidate rank 2 of 10

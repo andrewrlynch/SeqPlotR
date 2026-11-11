@@ -1,0 +1,5 @@
+from_event	to_event	kind	arrow	style_key	label	conflict
+sv_sim_bfb_amplicon_1	sv_sim_bfb_amplicon_3	hasse	TRUE	snv	fixed	FALSE
+sv_sim_bfb_amplicon_5	sv_sim_bfb_amplicon_1	hasse	TRUE	snv	fixed	FALSE
+sv_sim_bfb_amplicon_4	sv_sim_bfb_amplicon_2	hasse	TRUE	snv	0.99	FALSE
+sv_sim_bfb_amplicon_3	sv_sim_bfb_amplicon_4	hasse	TRUE	snv	0.91	FALSE

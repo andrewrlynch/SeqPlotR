@@ -1,0 +1,6 @@
+event_id	type	shape_key	x	y	bar_lo	bar_hi	glyph	layer	group_id	faded	alpha	label
+sv_sim_bfb_amplicon_1	SV	SV	1	0.50413992248954953	0.39709947392816708	0.61564846603892742	point	2	1	FALSE	1	sv_sim_bfb_amplicon_1
+sv_sim_bfb_amplicon_2	SV	SV	2	0.77748402441703635	0.61744069812029223	0.93109199172767709	point	5	2	FALSE	1	sv_sim_bfb_amplicon_2
+sv_sim_bfb_amplicon_3	SV	SV	3	0.58584582807800567	0.46347346266724632	0.72440658284556314	point	3	3	FALSE	1	sv_sim_bfb_amplicon_3
+sv_sim_bfb_amplicon_4	SV	SV	4	0.72294201984936612	0.5615394243912516	0.85644927677172744	point	4	4	FALSE	1	sv_sim_bfb_amplicon_4
+sv_sim_bfb_amplicon_5	SV	SV	5	0.37721365797447975	0.26538422883495416	0.49725825833327125	point	1	5	FALSE	1	sv_sim_bfb_amplicon_5

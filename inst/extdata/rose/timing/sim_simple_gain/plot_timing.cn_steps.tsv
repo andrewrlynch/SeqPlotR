@@ -1,0 +1,2 @@
+seg_id	haplotype	step	event_id	chr	start	end	direction	delta	k	label	credit	timing_basis	bound_type	glyph	y	bar_lo	bar_hi	faded	alpha	colour_key
+2	A	1	gain_2_1	chr8	47200001	145138636	gain	1	1	NA	1	snv	NA	point	0.39325846407679088	0.34455911324037453	0.44063436567524567	FALSE	1	gain
